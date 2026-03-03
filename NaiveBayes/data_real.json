@@ -1,0 +1,382 @@
+[
+  {
+    "clima": "Soleado",
+    "temperatura": "Calor",
+    "humedad": "Alta",
+    "viento": "Debil",
+    "juego": "No"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Calor",
+    "humedad": "Alta",
+    "viento": "Fuerte",
+    "juego": "No"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Calor",
+    "humedad": "Normal",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Calor",
+    "humedad": "Normal",
+    "viento": "Fuerte",
+    "juego": "Si"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Calor",
+    "humedad": "Baja",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Calor",
+    "humedad": "Baja",
+    "viento": "Fuerte",
+    "juego": "Si"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Templado",
+    "humedad": "Alta",
+    "viento": "Debil",
+    "juego": "No"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Templado",
+    "humedad": "Alta",
+    "viento": "Fuerte",
+    "juego": "No"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Templado",
+    "humedad": "Normal",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Templado",
+    "humedad": "Normal",
+    "viento": "Fuerte",
+    "juego": "Si"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Templado",
+    "humedad": "Baja",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Templado",
+    "humedad": "Baja",
+    "viento": "Fuerte",
+    "juego": "Si"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Frio",
+    "humedad": "Alta",
+    "viento": "Debil",
+    "juego": "No"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Frio",
+    "humedad": "Alta",
+    "viento": "Fuerte",
+    "juego": "No"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Frio",
+    "humedad": "Normal",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Frio",
+    "humedad": "Normal",
+    "viento": "Fuerte",
+    "juego": "Si"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Frio",
+    "humedad": "Baja",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Soleado",
+    "temperatura": "Frio",
+    "humedad": "Baja",
+    "viento": "Fuerte",
+    "juego": "Si"
+  },
+
+  {
+    "clima": "Nublado",
+    "temperatura": "Calor",
+    "humedad": "Alta",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Calor",
+    "humedad": "Alta",
+    "viento": "Fuerte",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Calor",
+    "humedad": "Normal",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Calor",
+    "humedad": "Normal",
+    "viento": "Fuerte",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Calor",
+    "humedad": "Baja",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Calor",
+    "humedad": "Baja",
+    "viento": "Fuerte",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Templado",
+    "humedad": "Alta",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Templado",
+    "humedad": "Alta",
+    "viento": "Fuerte",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Templado",
+    "humedad": "Normal",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Templado",
+    "humedad": "Normal",
+    "viento": "Fuerte",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Templado",
+    "humedad": "Baja",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Templado",
+    "humedad": "Baja",
+    "viento": "Fuerte",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Frio",
+    "humedad": "Alta",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Frio",
+    "humedad": "Alta",
+    "viento": "Fuerte",
+    "juego": "No"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Frio",
+    "humedad": "Normal",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Frio",
+    "humedad": "Normal",
+    "viento": "Fuerte",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Frio",
+    "humedad": "Baja",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Nublado",
+    "temperatura": "Frio",
+    "humedad": "Baja",
+    "viento": "Fuerte",
+    "juego": "Si"
+  },
+
+  {
+    "clima": "Lluvia",
+    "temperatura": "Calor",
+    "humedad": "Alta",
+    "viento": "Debil",
+    "juego": "No"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Calor",
+    "humedad": "Alta",
+    "viento": "Fuerte",
+    "juego": "No"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Calor",
+    "humedad": "Normal",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Calor",
+    "humedad": "Normal",
+    "viento": "Fuerte",
+    "juego": "No"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Calor",
+    "humedad": "Baja",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Calor",
+    "humedad": "Baja",
+    "viento": "Fuerte",
+    "juego": "No"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Templado",
+    "humedad": "Alta",
+    "viento": "Debil",
+    "juego": "No"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Templado",
+    "humedad": "Alta",
+    "viento": "Fuerte",
+    "juego": "No"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Templado",
+    "humedad": "Normal",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Templado",
+    "humedad": "Normal",
+    "viento": "Fuerte",
+    "juego": "No"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Templado",
+    "humedad": "Baja",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Templado",
+    "humedad": "Baja",
+    "viento": "Fuerte",
+    "juego": "No"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Frio",
+    "humedad": "Alta",
+    "viento": "Debil",
+    "juego": "No"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Frio",
+    "humedad": "Alta",
+    "viento": "Fuerte",
+    "juego": "No"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Frio",
+    "humedad": "Normal",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Frio",
+    "humedad": "Normal",
+    "viento": "Fuerte",
+    "juego": "No"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Frio",
+    "humedad": "Baja",
+    "viento": "Debil",
+    "juego": "Si"
+  },
+  {
+    "clima": "Lluvia",
+    "temperatura": "Frio",
+    "humedad": "Baja",
+    "viento": "Fuerte",
+    "juego": "No"
+  }
+]
