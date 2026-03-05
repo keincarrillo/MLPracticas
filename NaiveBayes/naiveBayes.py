@@ -1,126 +1,154 @@
 import json
 from collections import defaultdict
 
-# cargar datos desde archivo json
-with open('data_real.json', encoding='utf-8') as f:
-    datos = json.load(f)
+# lee el archivo JSON que contiene tanto la config como los registros
+with open('data/data_set.json', encoding='utf-8') as archivo:
+    dataset = json.load(archivo)
 
-# clases posibles
-CLASES = ['Si', 'No']
+# extrae la configuracion del modelo desde el JSON
+config              = dataset['config']
+nombre_campo_clase  = config['clase_campo']   # campo a predecir
+nombres_features    = config['features']      # lista de features
+valores_por_feature = config['valores']       # valores posibles por feature
+clases_posibles     = config['clases']        # clases posibles (ej. Si / No)
 
-# caracteristicas que usa el modelo
-FEATURES = ['clima', 'temperatura', 'humedad', 'viento']
+# extrae los registros del JSON
+registros = dataset['datos']
 
+# recibe el dataset y retorna prior y likelihood calculados con suavizado de Laplace
+# entrenar(registros_entrenamiento: list[dict]) -> (probabilidad_prior: dict, probabilidad_likelihood: dict)
+def entrenar(registros_entrenamiento):
+    total_registros = len(registros_entrenamiento)
 
-# entrenar modelo naive bayes sin suavizado
-def entrenar(datos):
-    total = len(datos)
+    # cuantas veces aparece cada clase en el dataset
+    conteo_por_clase = defaultdict(int)
 
-    # contar clases
-    conteo_clase = defaultdict(int)
+    # cuantas veces aparece cada combinacion (clase, feature, valor)
+    conteo_por_clase_feature_valor = defaultdict(int)
 
-    # contar valores por clase
-    conteo = defaultdict(int)
+    # recorre cada registro y acumula los conteos
+    for registro in registros_entrenamiento:
+        clase_actual = registro[nombre_campo_clase]
+        conteo_por_clase[clase_actual] += 1
+        for feature in nombres_features:
+            clave = (clase_actual, feature, registro[feature])
+            conteo_por_clase_feature_valor[clave] += 1
 
-    for d in datos:
-        c = d['juego']
-        conteo_clase[c] += 1
-        for f in FEATURES:
-            conteo[(c, f, d[f])] += 1
+    # P(clase): probabilidad de cada clase en el dataset
+    # +1 y +num_clases es el suavizado de Laplace para evitar probabilidades de cero
+    probabilidad_prior = {
+        clase: (conteo_por_clase[clase] + 1) / (total_registros + len(clases_posibles))
+        for clase in clases_posibles
+    }
 
-    # calcular probabilidad de cada clase
-    prior = {c: conteo_clase[c] / total for c in CLASES}
+    # P(valor | clase): probabilidad de cada valor dado que el registro pertenece a cierta clase
+    # +1 y +num_valores es el suavizado de Laplace
+    probabilidad_likelihood = {}
+    for clase in clases_posibles:
+        for feature in nombres_features:
+            for valor in valores_por_feature[feature]:
+                clave = (clase, feature, valor)
+                probabilidad_likelihood[clave] = (
+                    conteo_por_clase_feature_valor[clave] + 1
+                ) / (conteo_por_clase[clase] + len(valores_por_feature[feature]))
 
-    # calcular probabilidad de cada valor dado la clase
-    likelihood = {}
-    for c in CLASES:
-        for f in FEATURES:
-            for d in datos:
-                val = d[f]
-                if conteo_clase[c] == 0:
-                    likelihood[(c, f, val)] = 0
-                else:
-                    likelihood[(c, f, val)] = (
-                        conteo[(c, f, val)] / conteo_clase[c]
-                    )
+    return probabilidad_prior, probabilidad_likelihood
 
-    return prior, likelihood
+# recibe una muestra sin clase, retorna la clase predicha y el porcentaje de cada clase
+# predecir(muestra: dict, probabilidad_prior: dict, probabilidad_likelihood: dict) -> (clase_predicha: str | None, probabilidades_normalizadas: dict)
+def predecir(muestra, probabilidad_prior, probabilidad_likelihood):
+    puntaje_por_clase = {}
 
+    for clase in clases_posibles:
+        # empieza con P(clase) y multiplica P(valor | clase) por cada feature
+        probabilidad_acumulada = probabilidad_prior[clase]
+        for feature in nombres_features:
+            clave = (clase, feature, muestra[feature])
+            probabilidad_acumulada *= probabilidad_likelihood.get(clave, 0)
+        puntaje_por_clase[clase] = probabilidad_acumulada
 
-# predecir clase de una muestra
-def predecir(muestra, prior, likelihood):
-    scores = {}
+    # normaliza los puntajes para que las probabilidades sumen 1
+    suma_puntajes = sum(puntaje_por_clase.values())
 
-    # multiplicar probabilidades
-    for c in CLASES:
-        p = prior[c]
-        for f in FEATURES:
-            p *= likelihood.get((c, f, muestra[f]), 0)
-        scores[c] = p
+    # si todos los puntajes son cero no se puede clasificar
+    if suma_puntajes == 0:
+        return None, {clase: 0 for clase in clases_posibles}
 
-    total = sum(scores.values())
+    probabilidades_normalizadas = {
+        clase: puntaje_por_clase[clase] / suma_puntajes
+        for clase in clases_posibles
+    }
 
-    # si todo es cero no se puede clasificar
-    if total == 0:
-        return None, {c: 0 for c in CLASES}
+    # retorna la clase con mayor probabilidad
+    clase_predicha = max(probabilidades_normalizadas, key=probabilidades_normalizadas.get)
 
-    # normalizar probabilidades
-    probs = {c: scores[c] / total for c in CLASES}
+    return clase_predicha, probabilidades_normalizadas
 
-    # elegir clase con mayor probabilidad
-    pred = max(probs, key=probs.get)
+# entrena y evalua N veces dejando un registro fuera como prueba en cada iteracion
+# retorna la proporcion de predicciones correctas como estimacion sobre datos nuevos
+# leave_one_out(registros: list[dict]) -> exactitud: float
+def leave_one_out(registros):
+    predicciones_correctas = 0
 
-    return pred, probs
+    for indice in range(len(registros)):
+        # usa todos los registros menos el actual para entrenar
+        registros_train = registros[:indice] + registros[indice + 1:]
+        registro_test   = registros[indice]
 
+        # entrena sin el registro de prueba y predice sobre el
+        prior_loo, likelihood_loo = entrenar(registros_train)
+        clase_predicha, _         = predecir(registro_test, prior_loo, likelihood_loo)
 
-# validacion leave one out
-def leave_one_out(datos):
-    correctos = 0
+        if clase_predicha == registro_test[nombre_campo_clase]:
+            predicciones_correctas += 1
 
-    for i in range(len(datos)):
-        train = datos[:i] + datos[i+1:]
-        test = datos[i]
+    return predicciones_correctas / len(registros)
 
-        prior, likelihood = entrenar(train)
-        pred, _ = predecir(test, prior, likelihood)
-
-        if pred == test['juego']:
-            correctos += 1
-
-    return correctos / len(datos)
-
-
-# programa principal
 if __name__ == "__main__":
+    # entrena el modelo con todos los registros
+    prior, likelihood = entrenar(registros)
 
-    # entrenar con todos los datos
-    prior, likelihood = entrenar(datos)
-
-    # calcular exactitud en entrenamiento
-    correctos = sum(
-        1 for d in datos
-        if predecir(d, prior, likelihood)[0] == d['juego']
+    # cuenta cuantos registros del dataset se clasifican correctamente
+    aciertos_entrenamiento = sum(
+        1 for registro in registros
+        if predecir(registro, prior, likelihood)[0] == registro[nombre_campo_clase]
     )
 
-    print("\n=== EVALUACION ===")
-    print("Exactitud entrenamiento:", correctos / len(datos))
-    print("Exactitud Leave One Out:", leave_one_out(datos))
+    # convierte los aciertos a porcentaje
+    exactitud_entrenamiento = round(aciertos_entrenamiento / len(registros) * 100, 2)
+    exactitud_loo           = round(leave_one_out(registros) * 100, 2)
 
-    # modo interactivo para predecir nuevos casos
+    print("\n--- EVALUACION ---")
+    print(f"Exactitud entrenamiento : {exactitud_entrenamiento} %")
+    print(f"Exactitud Leave One Out : {exactitud_loo} %")
+
+    # bucle para predecir nuevos casos hasta que el usuario decida salir
     while True:
-        print("\nIngresa valores:")
-        caso = {}
-        for f in FEATURES:
-            caso[f] = input(f"{f}: ").capitalize()
+        print("\nIngresa valores para predecir:")
+        muestra_usuario = {}
 
-        pred, probs = predecir(caso, prior, likelihood)
+        # pide al usuario el valor de cada feature y valida que sea una opcion valida
+        for feature in nombres_features:
+            opciones = valores_por_feature[feature]
+            print(f"  {feature}: {opciones}")
 
-        if pred is None:
-            print("No se pudo clasificar")
+            while True:
+                valor_ingresado = input("  > ").strip().capitalize()
+                if valor_ingresado in opciones:
+                    muestra_usuario[feature] = valor_ingresado
+                    break
+                print("  Valor invalido, intenta de nuevo")
+
+        # clasifica la muestra ingresada
+        clase_predicha, probabilidades = predecir(muestra_usuario, prior, likelihood)
+
+        if clase_predicha is None:
+            print("No se pudo clasificar la muestra")
         else:
-            print("\nResultado:", pred)
-            print("Si =", round(probs['Si'] * 100, 2), "%")
-            print("No =", round(probs['No'] * 100, 2), "%")
+            print(f"\nResultado: {clase_predicha}")
+            # muestra el porcentaje de cada clase
+            for clase in clases_posibles:
+                print(f"  {clase} = {round(probabilidades[clase] * 100, 2)} %")
 
-        if input("\nOtro s n: ").lower() != 's':
+        if input("\nOtro s/n: ").strip().lower() != 's':
             break
