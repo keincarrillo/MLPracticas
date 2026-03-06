@@ -1,23 +1,33 @@
 import json
 from collections import defaultdict
 
-# lee el archivo JSON que contiene tanto la config como los registros
+# lee el archivo JSON y guarda todos los registros en una lista de diccionarios
 with open('data/data_set.json', encoding='utf-8') as archivo:
     dataset = json.load(archivo)
 
-# extrae la configuracion del modelo desde el JSON
-config              = dataset['config']
-nombre_campo_clase  = config['clase_campo']   # campo a predecir
-nombres_features    = config['features']      # lista de features
-valores_por_feature = config['valores']       # valores posibles por feature
-clases_posibles     = config['clases']        # clases posibles (ej. Si / No)
+# soporta dos formatos: {config, datos} o directamente una lista de registros
+registros = dataset['datos'] if isinstance(dataset, dict) and 'datos' in dataset else dataset
 
-# extrae los registros del JSON
-registros = dataset['datos']
+# el ultimo campo del primer registro es la variable a predecir
+nombre_campo_clase  = list(registros[0].keys())[-1]
+
+# todos los campos excepto la clase son los atributos de entrada (features)
+nombres_features    = [campo for campo in registros[0].keys() if campo != nombre_campo_clase]
+
+# valores posibles de cada feature, detectados recorriendo todo el dataset
+valores_por_feature = {
+    feature: list({registro[feature] for registro in registros})
+    for feature in nombres_features
+}
+
+# clases posibles (ej. Si / No), detectadas recorriendo todo el dataset
+clases_posibles     = list({registro[nombre_campo_clase] for registro in registros})
+
 
 # recibe el dataset y retorna prior y likelihood calculados con suavizado de Laplace
 # entrenar(registros_entrenamiento: list[dict]) -> (probabilidad_prior: dict, probabilidad_likelihood: dict)
 def entrenar(registros_entrenamiento):
+
     total_registros = len(registros_entrenamiento)
 
     # cuantas veces aparece cada clase en el dataset
@@ -54,9 +64,11 @@ def entrenar(registros_entrenamiento):
 
     return probabilidad_prior, probabilidad_likelihood
 
+
 # recibe una muestra sin clase, retorna la clase predicha y el porcentaje de cada clase
 # predecir(muestra: dict, probabilidad_prior: dict, probabilidad_likelihood: dict) -> (clase_predicha: str | None, probabilidades_normalizadas: dict)
 def predecir(muestra, probabilidad_prior, probabilidad_likelihood):
+
     puntaje_por_clase = {}
 
     for clase in clases_posibles:
@@ -84,10 +96,12 @@ def predecir(muestra, probabilidad_prior, probabilidad_likelihood):
 
     return clase_predicha, probabilidades_normalizadas
 
+
 # entrena y evalua N veces dejando un registro fuera como prueba en cada iteracion
 # retorna la proporcion de predicciones correctas como estimacion sobre datos nuevos
 # leave_one_out(registros: list[dict]) -> exactitud: float
 def leave_one_out(registros):
+
     predicciones_correctas = 0
 
     for indice in range(len(registros)):
@@ -104,7 +118,9 @@ def leave_one_out(registros):
 
     return predicciones_correctas / len(registros)
 
+
 if __name__ == "__main__":
+
     # entrena el modelo con todos los registros
     prior, likelihood = entrenar(registros)
 
