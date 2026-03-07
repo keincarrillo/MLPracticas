@@ -1,31 +1,36 @@
 # Naive Bayes - Prediccion de Juego
 
 Clasificador Naive Bayes que predice si se jugara o no dependiendo de las condiciones climaticas.
+Soporta features discretos (strings) y continuos (numeros) de forma automatica.
 
 ## Archivos
 
-- `naiveBayes.py` — clasificador principal
-- `data/data_set.json` — dataset de entrenamiento (60 registros)
-- `data/data_real.json` — dataset alternativo (54 registros)
+- `main.py` — carga del dataset, deteccion automatica y loop interactivo
+- `modelo.py` — logica del clasificador (entrenar, predecir, leave_one_out)
+- `utils.py` — funciones matematicas (media, desviacion, gaussiana)
+- `data/data_set.json` — dataset de entrenamiento (60 registros, discreto)
+- `data/data_real.json` — dataset alternativo (54 registros, discreto)
+- `data/iris.json` — dataset iris (150 registros, continuo)
 
 ## Como funciona
 
 1. Lee el dataset desde un JSON
-2. Detecta automaticamente los features, valores posibles y clases
-3. Entrena el modelo calculando probabilidades con suavizado de Laplace
-4. Evalua la exactitud con Leave-One-Out Cross Validation
-5. Permite ingresar nuevos casos para predecir interactivamente
+2. Detecta automaticamente features, valores posibles y clases
+3. Clasifica cada feature como discreto (str) o continuo (int/float)
+4. Entrena el modelo con Laplace para discretos y Gaussiana para continuos
+5. Evalua la exactitud con Leave-One-Out Cross Validation
+6. Permite ingresar nuevos casos para predecir interactivamente
 
 ## Como correrlo
 
 ```bash
-python naiveBayes.py
+python3 src/main.py
 ```
 
-Para usar otro dataset, cambiar la ruta en la linea 4 del codigo:
+Para usar otro dataset, cambiar la ruta en `main.py`:
 
 ```python
-with open('data/data_real.json', encoding='utf-8') as archivo:
+with open('data/iris.json', encoding='utf-8') as archivo:
 ```
 
 ## Ejemplo de salida
@@ -52,7 +57,9 @@ Resultado: Si
 
 ## Formato del dataset
 
-Lista de objetos JSON donde el **ultimo campo** es la clase a predecir:
+Lista de objetos JSON donde el **ultimo campo** es la clase a predecir.
+
+Discreto:
 
 ```json
 [
@@ -62,13 +69,20 @@ Lista de objetos JSON donde el **ultimo campo** es la clase a predecir:
     "humedad": "Alta",
     "viento": "Debil",
     "juego": "No"
-  },
+  }
+]
+```
+
+Continuo:
+
+```json
+[
   {
-    "clima": "Nublado",
-    "temperatura": "Frio",
-    "humedad": "Baja",
-    "viento": "Debil",
-    "juego": "Si"
+    "sepal length (cm)": 5.1,
+    "sepal width (cm)": 3.5,
+    "petal length (cm)": 1.4,
+    "petal width (cm)": 0.2,
+    "especie": "setosa"
   }
 ]
 ```
