@@ -11,7 +11,7 @@ BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data')
 
 DATASETS = {
     '1': (os.path.join(BASE, 'iris.json'), 'Iris'),
-    '2': (os.path.join(BASE, 'wdbc.data'), 'Breast Cancer Wisconsin'),
+    '2': (os.path.join(BASE, 'wdbc.json'), 'Breast Cancer Wisconsin'),
 }
 
 # ─────────────────────────────────────────────────────────────
