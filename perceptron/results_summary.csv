@@ -1,0 +1,7 @@
+Modelo,Acc Train,Acc Test,F1 Test,AUC Test,MCC Test,Tiempo(ms),Convergencia,PSO Partículas,PSO Mejor Fit
+Escalón+Delta Clásico,0.9824,0.9298,0.9437,0.9805,0.8513,1048.6,—,,
+Escalón+Delta Estocástico,0.9978,0.9561,0.9650,0.9868,0.9064,1140.3,—,,
+Sigmoide+Gradient Clásico,0.9868,0.9737,0.9790,0.9957,0.9439,190.9,—,,
+Sigmoide+Gradient Estocástico,0.9890,0.9737,0.9793,0.9924,0.9433,2084.9,71,,
+Sigmoide+PSO Clásico,0.9890,0.9649,0.9722,0.9931,0.9246,680.1,9,40,0.03215
+Sigmoide+PSO Estocástico,0.9560,0.9474,0.9577,0.9901,0.8886,379.8,6,30,0.01074
