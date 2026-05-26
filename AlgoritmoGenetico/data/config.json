@@ -1,0 +1,10 @@
+{
+  "n_elementos": 1e20,
+  "tam_poblacion": 60,
+  "num_generaciones": 300,
+  "tasa_mutacion": 0.15,
+  "tasa_cruce": 0.85,
+  "tam_torneo": 3,
+  "long_cromosoma": 8,
+  "semilla": 42
+}
