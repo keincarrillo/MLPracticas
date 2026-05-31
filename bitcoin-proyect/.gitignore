@@ -1,0 +1,21 @@
+# Entorno virtual
+model/venv/
+
+# Archivos generados por el modelo
+model/modelo.h5
+model/scaler.pkl
+model/loss_curve.png
+model/predictions.png
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Node
+api/node_modules/
+frontend/node_modules/
+
+# macOS
+.DS_Store
