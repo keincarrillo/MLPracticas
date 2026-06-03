@@ -57,7 +57,7 @@ def imprimir_configuracion():
     tabla_fila("Longitud del cromosoma", f"{long_cromosoma} genes (gaps)")
     tabla_fila("Tasa de mutacion",       f"{config['tasa_mutacion'] * 100:.0f} %")
     tabla_fila("Tasa de cruce",          f"{config['tasa_cruce'] * 100:.0f} %")
-    tabla_fila("Tamano de torneo",       config['tam_torneo'])
+    tabla_fila("Metodo de seleccion",    "Ruleta (proporcional al fitness)")
     tabla_fila("Semilla aleatoria",      semilla if semilla is not None else "ninguna (aleatorio)")
     print()
 

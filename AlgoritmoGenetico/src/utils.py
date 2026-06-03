@@ -1,5 +1,6 @@
 from math import sqrt, log2
 
+
 # comparaciones_shell(gaps: list[int], n: float) -> float
 # estima el numero de comparaciones del Shell Sort para una secuencia de gaps y n elementos
 # modelo teorico: cada pasada con gap h cuesta O(n * sqrt(h)) comparaciones
@@ -16,6 +17,7 @@ def comparaciones_shell(gaps, n):
 # fitness(cromosoma: list[int], n: float) -> float
 # calcula el costo de una secuencia de gaps (menor es mejor)
 # penaliza gaps invalidos, ausencia de gap=1, y malas proporciones entre gaps consecutivos
+# el ratio empiricamente optimo entre gaps consecutivos ronda 2.2 - 2.5 (usamos 2.3 como centro)
 def fitness(cromosoma, n):
     gaps = sorted(set(g for g in cromosoma if g >= 1), reverse=True)
 

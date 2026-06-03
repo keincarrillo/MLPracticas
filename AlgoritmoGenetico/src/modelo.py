@@ -1,6 +1,7 @@
 import random
 from utils import fitness, cromosoma_a_gaps
 
+
 # inicializar_poblacion(tam_poblacion: int, long_cromosoma: int, n: float, semilla: int | None) -> list[list[int]]
 # genera una poblacion inicial aleatoria de cromosomas
 # cada cromosoma es una lista de gaps enteros positivos, el ultimo siempre es 1
@@ -28,12 +29,39 @@ def evaluar_poblacion(poblacion, n):
     return [fitness(cromosoma, n) for cromosoma in poblacion]
 
 
-# seleccion_torneo(poblacion: list[list[int]], fitnesses: list[float], tam_torneo: int) -> list[int]
-# elige tam_torneo candidatos al azar y retorna el cromosoma con menor fitness
-def seleccion_torneo(poblacion, fitnesses, tam_torneo):
-    candidatos = random.sample(range(len(poblacion)), tam_torneo)
-    ganador    = min(candidatos, key=lambda i: fitnesses[i])
-    return poblacion[ganador]
+# seleccion_ruleta(poblacion: list[list[int]], fitnesses: list[float]) -> list[int]
+# seleccion proporcional al fitness usando el metodo de ruleta (roulette wheel selection)
+# como el problema es de minimizacion, se invierte el fitness para que los menores
+# tengan mayor probabilidad de ser seleccionados
+# individuos con fitness infinito quedan excluidos de la seleccion
+def seleccion_ruleta(poblacion, fitnesses):
+    # filtrar individuos validos (fitness finito)
+    pares_validos = [(i, f) for i, f in enumerate(fitnesses) if f != float('inf')]
+
+    # si todos son invalidos, retornar cualquier individuo al azar
+    if not pares_validos:
+        return random.choice(poblacion)
+
+    # invertir fitness: fitness menor => peso mayor
+    fitness_max = max(f for _, f in pares_validos)
+    pesos       = [fitness_max - f for _, f in pares_validos]
+    total_pesos = sum(pesos)
+
+    # si todos los pesos son 0 (fitness identico), seleccion uniforme entre validos
+    if total_pesos == 0:
+        indice = random.choice([i for i, _ in pares_validos])
+        return poblacion[indice]
+
+    # girar la ruleta: acumular pesos y elegir con un valor aleatorio
+    punto      = random.uniform(0, total_pesos)
+    acumulado  = 0.0
+    for indice_original, peso in zip([i for i, _ in pares_validos], pesos):
+        acumulado += peso
+        if acumulado >= punto:
+            return poblacion[indice_original]
+
+    # fallback: retornar el ultimo valido
+    return poblacion[pares_validos[-1][0]]
 
 
 # cruce_un_punto(padre1: list[int], padre2: list[int]) -> tuple[list[int], list[int]]
@@ -64,20 +92,19 @@ def mutar(cromosoma, tasa_mutacion, n):
 
 
 # evolucionar(poblacion, fitnesses, config, n) -> list[list[int]]
-# genera la siguiente generacion aplicando elitismo, seleccion, cruce y mutacion
+# genera la siguiente generacion aplicando elitismo, seleccion por ruleta, cruce y mutacion
 def evolucionar(poblacion, fitnesses, config, n):
     tam_poblacion = config['tam_poblacion']
     tasa_mutacion = config['tasa_mutacion']
     tasa_cruce    = config['tasa_cruce']
-    tam_torneo    = config['tam_torneo']
 
     # elitismo: el mejor individuo pasa sin cambios a la siguiente generacion
     indice_elite    = min(range(len(fitnesses)), key=lambda i: fitnesses[i])
     nueva_poblacion = [poblacion[indice_elite][:]]
 
     while len(nueva_poblacion) < tam_poblacion:
-        padre1 = seleccion_torneo(poblacion, fitnesses, tam_torneo)
-        padre2 = seleccion_torneo(poblacion, fitnesses, tam_torneo)
+        padre1 = seleccion_ruleta(poblacion, fitnesses)
+        padre2 = seleccion_ruleta(poblacion, fitnesses)
 
         if random.random() < tasa_cruce:
             hijo1, hijo2 = cruce_un_punto(padre1, padre2)
