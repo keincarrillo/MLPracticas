@@ -1,7 +1,7 @@
 import Router from 'express'
 import path from 'path'
 import { existsSync } from 'fs'
-import { spawnPython, MODEL_DIR } from '../utils/python'
+import { spawnPython, MODEL_DIR } from '@/utils/python'
 
 const router = Router()
 
