@@ -5,18 +5,20 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dropout, Dense
 from tensorflow.keras.callbacks import EarlyStopping
 import matplotlib.pyplot as plt
-import os
 
 from preprocess import download_data, normalize, build_sequences, split_and_reshape
 
-SEED = 42
-UNITS = 50
-DROPOUT = 0.2
-EPOCHS = 20
+SEED       = 42
+UNITS      = 50
+DROPOUT    = 0.2
+EPOCHS     = 20
 BATCH_SIZE = 32
 MODEL_PATH = "modelo.h5"
 
 
+# build_model(window: int) -> Sequential
+# construye la arquitectura de la red neuronal LSTM
+# una capa LSTM seguida de Dropout para regularizacion y Dense para la salida
 def build_model(window: int = 60) -> Sequential:
     tf.random.set_seed(SEED)
     model = Sequential([
@@ -28,25 +30,31 @@ def build_model(window: int = 60) -> Sequential:
     return model
 
 
+# plot_loss(history) -> None
+# genera y guarda la grafica de curva de aprendizaje (loss de entrenamiento vs validacion)
 def plot_loss(history):
     plt.figure(figsize=(10, 4))
-    plt.plot(history.history["loss"], label="Entrenamiento")
-    plt.plot(history.history["val_loss"], label="Validación")
+    plt.plot(history.history["loss"],     label="Entrenamiento")
+    plt.plot(history.history["val_loss"], label="Validacion")
     plt.title("Curva de aprendizaje")
-    plt.xlabel("Época")
+    plt.xlabel("Epoca")
     plt.ylabel("MSE")
     plt.legend()
     plt.tight_layout()
     plt.savefig("loss_curve.png")
-    print("  Gráfica guardada en loss_curve.png")
+    print("  Grafica guardada en loss_curve.png")
 
+
+# -----------------------------------------------------------------------
+# punto de entrada — entrenamiento completo del modelo
+# -----------------------------------------------------------------------
 
 if __name__ == "__main__":
     print("Cargando y preprocesando datos...")
-    df = download_data()
-    prices = df["Close"].values.reshape(-1, 1)
-    scaled, _ = normalize(prices)
-    X, y = build_sequences(scaled)
+    df               = download_data()
+    prices           = df["Close"].values.reshape(-1, 1)
+    scaled, _        = normalize(prices)
+    X, y             = build_sequences(scaled)
     X_train, X_test, y_train, y_test = split_and_reshape(X, y)
 
     print("Construyendo modelo...")
