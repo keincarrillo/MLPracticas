@@ -1,7 +1,15 @@
 # predict.py
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
+import sys
+import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import tensorflow as tf
+tf.get_logger().setLevel("ERROR")
+
 from tensorflow.keras.models import load_model
 from sklearn.metrics import mean_absolute_error
 
@@ -27,7 +35,7 @@ def get_predictions():
 
     model = load_model(MODEL_PATH)
 
-    pred_scaled = model.predict(X_test)
+    pred_scaled = model.predict(X_test, verbose=0)
     pred        = scaler.inverse_transform(pred_scaled)
     real        = scaler.inverse_transform(y_test.reshape(-1, 1))
 
@@ -118,20 +126,49 @@ def plot_predictions():
 
 
 # -----------------------------------------------------------------------
+# modo API — flags para ser llamado desde la API REST en Bun
+# --history  imprime JSON con fechas y precios historicos
+# --predict  imprime JSON con precios reales y predichos del conjunto de prueba
+# --metrics  imprime JSON con el MAE calculado
+# -----------------------------------------------------------------------
+
+def run_api_mode(flag: str) -> None:
+    if flag == "--history":
+        dates, prices = get_history()
+        print(json.dumps({"dates": dates, "prices": prices}))
+
+    elif flag == "--predict":
+        real, pred = get_predictions()
+        print(json.dumps({"real": real, "predicted": pred}))
+
+    elif flag == "--metrics":
+        mae = get_metrics()
+        print(json.dumps({"mae": mae}))
+
+    else:
+        print(json.dumps({"error": f"flag desconocido: {flag}"}), file=sys.stderr)
+        sys.exit(1)
+
+
+# -----------------------------------------------------------------------
 # punto de entrada — genera las tres graficas, MAE y forecast
+# si se pasa un flag de API solo imprime JSON y termina
 # -----------------------------------------------------------------------
 
 if __name__ == "__main__":
-    print("Generando grafica de historial...")
-    plot_history()
+    if len(sys.argv) > 1:
+        run_api_mode(sys.argv[1])
+    else:
+        print("Generando grafica de historial...")
+        plot_history()
 
-    print("Generando predicciones...")
-    plot_predictions()
+        print("Generando predicciones...")
+        plot_predictions()
 
-    mae = get_metrics()
-    print(f"  MAE: ${mae:,.2f} USD")
+        mae = get_metrics()
+        print(f"  MAE: ${mae:,.2f} USD")
 
-    print("Generando forecast 30 dias...")
-    fechas, precios = forecast_next_days()
-    for fecha, precio in zip(fechas, precios):
-        print(f"  {fecha}: ${precio:,.2f}")
+        print("Generando forecast 30 dias...")
+        fechas, precios = forecast_next_days()
+        for fecha, precio in zip(fechas, precios):
+            print(f"  {fecha}: ${precio:,.2f}")
