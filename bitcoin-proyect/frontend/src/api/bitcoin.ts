@@ -7,7 +7,7 @@ import type {
   Metrics
 } from '@/types'
 
-const BASE = '/api'
+const BASE = `${import.meta.env.VITE_API_URL ?? ''}/api` || '/api'
 
 const client = axios.create({ baseURL: BASE })
 
