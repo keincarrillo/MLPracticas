@@ -5,7 +5,7 @@
 # ── Datos ─────────────────────────────────────────────────────────────────────
 
 TICKER      = "BTC-USD"
-YEARS       = 3          # años de historial a descargar
+YEARS       = 5          # años de historial a descargar
 WINDOW      = 60         # días de ventana deslizante para las secuencias LSTM
 TRAIN_SPLIT = 0.8        # proporción de datos para entrenamiento (80/20)
 
