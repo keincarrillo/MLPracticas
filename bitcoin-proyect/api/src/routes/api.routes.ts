@@ -1,96 +1,65 @@
+// routes/api.routes.ts
+// define los endpoints REST del dashboard de Bitcoin
+// cada handler es responsable solo de llamar el script correcto y devolver JSON
+// la lógica de "asegurar que el modelo existe" vive en los middlewares
+
 import Router from 'express'
-import path from 'path'
-import { existsSync } from 'fs'
-import { spawnPython, MODEL_DIR } from '@/utils/python'
+import { spawnPython, parsePythonJson } from '@/utils/python'
+import { ensureModel, ensureScaler } from '@/middleware/ensureModel'
 
 const router = Router()
 
-router.get('/history', async (_req, res) => {
+// GET /history
+// devuelve el historial completo de precios de cierre con fechas
+// solo requiere el scaler, no el modelo entrenado
+router.get('/history', ensureScaler, async (_req, res) => {
   try {
-    const scalerPath = path.join(MODEL_DIR, 'scaler.pkl')
-
-    // si no existe el scaler, correr preprocesamiento completo primero
-    if (!existsSync(scalerPath)) {
-      await spawnPython('preprocess.py')
-    }
-
     const output = await spawnPython('predict.py', ['--history'])
-    res.json(JSON.parse(output))
+    res.json(parsePythonJson(output))
   } catch (err) {
     res.status(500).json({ error: String(err) })
   }
 })
 
-// -----------------------------------------------------------------------
 // GET /predict
-// devuelve los precios reales y predichos del conjunto de prueba
-// ejecuta train.py si modelo.h5 no existe
-// -----------------------------------------------------------------------
-router.get('/predict', async (_req, res) => {
+// devuelve precios reales y predichos del conjunto de prueba
+router.get('/predict', ensureModel, async (_req, res) => {
   try {
-    const modelPath = path.join(MODEL_DIR, 'modelo.h5')
-
-    if (!existsSync(modelPath)) {
-      await spawnPython('preprocess.py')
-      await spawnPython('train.py')
-    }
-
     const output = await spawnPython('predict.py', ['--predict'])
-    res.json(JSON.parse(output))
+    res.json(parsePythonJson(output))
   } catch (err) {
     res.status(500).json({ error: String(err) })
   }
 })
 
-// -----------------------------------------------------------------------
 // GET /metrics
 // devuelve el MAE calculado sobre el conjunto de prueba
-// ejecuta train.py si modelo.h5 no existe
-// -----------------------------------------------------------------------
-router.get('/metrics', async (_req, res) => {
+router.get('/metrics', ensureModel, async (_req, res) => {
   try {
-    const modelPath = path.join(MODEL_DIR, 'modelo.h5')
-
-    if (!existsSync(modelPath)) {
-      await spawnPython('preprocess.py')
-      await spawnPython('train.py')
-    }
-
     const output = await spawnPython('predict.py', ['--metrics'])
-    res.json(JSON.parse(output))
+    res.json(parsePythonJson(output))
   } catch (err) {
     res.status(500).json({ error: String(err) })
   }
 })
 
-router.get('/forecast', async (_req, res) => {
+// GET /forecast
+// devuelve la predicción recursiva de los próximos 30 días
+router.get('/forecast', ensureModel, async (_req, res) => {
   try {
-    const modelPath = path.join(MODEL_DIR, 'modelo.h5')
-
-    if (!existsSync(modelPath)) {
-      await spawnPython('preprocess.py')
-      await spawnPython('train.py')
-    }
-
     const output = await spawnPython('predict.py', ['--forecast'])
-    res.json(JSON.parse(output))
+    res.json(parsePythonJson(output))
   } catch (err) {
     res.status(500).json({ error: String(err) })
   }
 })
 
-router.get('/loss', async (_req, res) => {
+// GET /loss
+// devuelve los datos de pérdida por época del último entrenamiento
+router.get('/loss', ensureModel, async (_req, res) => {
   try {
-    const lossPath = path.join(MODEL_DIR, 'loss_data.json')
-
-    if (!existsSync(lossPath)) {
-      // si no existe, entrenar primero
-      await spawnPython('preprocess.py')
-      await spawnPython('train.py')
-    }
-
     const output = await spawnPython('predict.py', ['--loss'])
-    res.json(JSON.parse(output))
+    res.json(parsePythonJson(output))
   } catch (err) {
     res.status(500).json({ error: String(err) })
   }
