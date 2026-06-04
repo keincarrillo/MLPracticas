@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import axios from 'axios'
 import {
   AreaChart,
   Area,
@@ -14,6 +15,10 @@ import {
 const API = '/api'
 
 // ── Types ────────────────────────────────────────────────────────────────────
+interface ForecastPoint {
+  date: string
+  price: number
+}
 interface HistoryPoint {
   date: string
   price: number
@@ -26,23 +31,30 @@ interface PredictPoint {
 interface Metrics {
   mae: number
 }
+interface LossPoint {
+  epoch: number
+  train: number
+  val: number
+}
 interface LoadingState {
   history: boolean
   predict: boolean
   metrics: boolean
+  forecast: boolean
+  loss: boolean
 }
 interface ErrorState {
   history?: boolean
   predict?: boolean
   metrics?: boolean
+  forecast?: boolean
+  loss?: boolean
 }
-
 interface TooltipPayloadItem {
   name?: string
   value?: number
   color?: string
 }
-
 interface ChartTooltipProps {
   active?: boolean
   payload?: TooltipPayloadItem[]
@@ -196,10 +208,14 @@ export default function BitcoinDashboard() {
   const [history, setHistory] = useState<HistoryPoint[] | null>(null)
   const [predict, setPredict] = useState<PredictPoint[] | null>(null)
   const [metrics, setMetrics] = useState<Metrics | null>(null)
+  const [forecast, setForecast] = useState<ForecastPoint[] | null>(null)
+  const [loss, setLoss] = useState<LossPoint[] | null>(null)
   const [loading, setLoading] = useState<LoadingState>({
     history: true,
     predict: true,
-    metrics: true
+    metrics: true,
+    forecast: true,
+    loss: true
   })
   const [errors, setErrors] = useState<ErrorState>({})
   const [now, setNow] = useState(new Date())
@@ -210,9 +226,9 @@ export default function BitcoinDashboard() {
   }, [])
 
   useEffect(() => {
-    fetch(`${API}/history`)
-      .then(r => r.json())
-      .then((d: { dates: string[]; prices: number[] }) => {
+    axios
+      .get<{ dates: string[]; prices: number[] }>(`${API}/history`)
+      .then(({ data: d }) => {
         const sampled = d.dates
           .map((date, i) => ({ date, price: d.prices[i] }))
           .filter((_, i) => i % 5 === 0)
@@ -224,9 +240,9 @@ export default function BitcoinDashboard() {
         setLoading(l => ({ ...l, history: false }))
       })
 
-    fetch(`${API}/predict`)
-      .then(r => r.json())
-      .then((d: { real: number[]; predicted: number[] }) => {
+    axios
+      .get<{ real: number[]; predicted: number[] }>(`${API}/predict`)
+      .then(({ data: d }) => {
         const data = d.real.map((r, i) => ({
           index: i,
           real: r,
@@ -240,15 +256,43 @@ export default function BitcoinDashboard() {
         setLoading(l => ({ ...l, predict: false }))
       })
 
-    fetch(`${API}/metrics`)
-      .then(r => r.json())
-      .then((d: Metrics) => {
+    axios
+      .get<Metrics>(`${API}/metrics`)
+      .then(({ data: d }) => {
         setMetrics(d)
         setLoading(l => ({ ...l, metrics: false }))
       })
       .catch(() => {
         setErrors(e => ({ ...e, metrics: true }))
         setLoading(l => ({ ...l, metrics: false }))
+      })
+
+    axios
+      .get<{ dates: string[]; prices: number[] }>(`${API}/forecast`)
+      .then(({ data: d }) => {
+        const data = d.dates.map((date, i) => ({ date, price: d.prices[i] }))
+        setForecast(data)
+        setLoading(l => ({ ...l, forecast: false }))
+      })
+      .catch(() => {
+        setErrors(e => ({ ...e, forecast: true }))
+        setLoading(l => ({ ...l, forecast: false }))
+      })
+
+    axios
+      .get<{ epochs: number[]; train: number[]; val: number[] }>(`${API}/loss`)
+      .then(({ data: d }) => {
+        const data = d.epochs.map((epoch, i) => ({
+          epoch,
+          train: d.train[i],
+          val: d.val[i]
+        }))
+        setLoss(data)
+        setLoading(l => ({ ...l, loss: false }))
+      })
+      .catch(() => {
+        setErrors(e => ({ ...e, loss: true }))
+        setLoading(l => ({ ...l, loss: false }))
       })
   }, [])
 
@@ -326,6 +370,7 @@ export default function BitcoinDashboard() {
         </div>
       </div>
 
+      {/* ── Todo el contenido dentro de un solo div con padding ── */}
       <div style={{ padding: '32px 32px 64px' }}>
         {/* ── Stat row ── */}
         <div
@@ -362,7 +407,7 @@ export default function BitcoinDashboard() {
           />
         </div>
 
-        {/* ── History chart ── */}
+        {/* ── 1. Historial de precios ── */}
         <div style={{ marginBottom: 48 }}>
           <SectionHeader
             title="Historial de precios"
@@ -443,7 +488,7 @@ export default function BitcoinDashboard() {
           )}
         </div>
 
-        {/* ── Predict chart ── */}
+        {/* ── 2. Real vs Predicho ── */}
         <div style={{ marginBottom: 48 }}>
           <SectionHeader
             title="Real vs Predicho"
@@ -521,8 +566,6 @@ export default function BitcoinDashboard() {
               </LineChart>
             </ResponsiveContainer>
           )}
-
-          {/* legend */}
           <div
             style={{ display: 'flex', gap: 24, marginTop: 14, paddingLeft: 4 }}
           >
@@ -543,8 +586,132 @@ export default function BitcoinDashboard() {
           </div>
         </div>
 
-        {/* ── MAE detail ── */}
-        <div>
+        {/* ── 3. Curva de aprendizaje ── */}
+        <div style={{ marginBottom: 48 }}>
+          <SectionHeader
+            title="Curva de aprendizaje"
+            sub="Pérdida MSE por época — entrenamiento vs validación"
+          />
+          {loading.loss ? (
+            <Skeleton h={280} />
+          ) : errors.loss ? (
+            <div
+              style={{
+                height: 280,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ef4444',
+                fontSize: 12
+              }}
+            >
+              Error al cargar curva de aprendizaje
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart
+                data={loss ?? []}
+                margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid
+                  stroke="#1a1a1a"
+                  strokeDasharray="3 3"
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="epoch"
+                  tick={{
+                    fill: '#444',
+                    fontSize: 10,
+                    fontFamily: "'IBM Plex Mono'"
+                  }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v: number) => `E${v}`}
+                />
+                <YAxis
+                  tick={{
+                    fill: '#444',
+                    fontSize: 10,
+                    fontFamily: "'IBM Plex Mono'"
+                  }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v: number) => v.toFixed(4)}
+                  width={60}
+                />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null
+                    return (
+                      <div
+                        style={{
+                          background: '#0d0d0d',
+                          border: '1px solid #2a2a2a',
+                          padding: '10px 14px',
+                          fontFamily: "'IBM Plex Mono'",
+                          fontSize: 12
+                        }}
+                      >
+                        <p style={{ color: '#666', marginBottom: 4 }}>
+                          Época {label}
+                        </p>
+                        {payload.map((p, i) => (
+                          <p
+                            key={i}
+                            style={{ color: p.color, margin: '2px 0' }}
+                          >
+                            {p.name}: {Number(p.value).toFixed(6)}
+                          </p>
+                        ))}
+                      </div>
+                    )
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="train"
+                  name="Entrenamiento"
+                  stroke="#f7931a"
+                  strokeWidth={1.5}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="val"
+                  name="Validación"
+                  stroke="#818cf8"
+                  strokeWidth={1.5}
+                  dot={false}
+                  strokeDasharray="4 2"
+                  activeDot={{ r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+          <div
+            style={{ display: 'flex', gap: 24, marginTop: 14, paddingLeft: 4 }}
+          >
+            {(
+              [
+                ['#f7931a', 'Entrenamiento'],
+                ['#818cf8', 'Validación']
+              ] as [string, string][]
+            ).map(([color, label]) => (
+              <div
+                key={label}
+                style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+              >
+                <div style={{ width: 20, height: 2, background: color }} />
+                <span style={{ fontSize: 11, color: '#555' }}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── 4. Métricas del modelo ── */}
+        <div style={{ marginBottom: 48 }}>
           <SectionHeader
             title="Métricas del modelo"
             sub="Evaluación sobre el conjunto de prueba"
@@ -632,6 +799,88 @@ export default function BitcoinDashboard() {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* ── 5. Forecast 30 días ── */}
+        <div style={{ marginBottom: 48 }}>
+          <SectionHeader
+            title="Forecast — próximos 30 días"
+            sub="Predicción recursiva LSTM a partir del último precio conocido"
+          />
+          {loading.forecast ? (
+            <Skeleton h={280} />
+          ) : errors.forecast ? (
+            <div
+              style={{
+                height: 280,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ef4444',
+                fontSize: 12
+              }}
+            >
+              Error al cargar forecast
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <AreaChart
+                data={forecast ?? []}
+                margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="gradForecast" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#818cf8" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  stroke="#1a1a1a"
+                  strokeDasharray="3 3"
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="date"
+                  tick={{
+                    fill: '#444',
+                    fontSize: 10,
+                    fontFamily: "'IBM Plex Mono'"
+                  }}
+                  tickLine={false}
+                  axisLine={false}
+                  interval={4}
+                />
+                <YAxis
+                  tick={{
+                    fill: '#444',
+                    fontSize: 10,
+                    fontFamily: "'IBM Plex Mono'"
+                  }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={fmtShort}
+                  width={52}
+                />
+                <Tooltip content={<ChartTooltip />} />
+                <Area
+                  type="monotone"
+                  dataKey="price"
+                  name="Forecast"
+                  stroke="#818cf8"
+                  strokeWidth={1.5}
+                  fill="url(#gradForecast)"
+                  dot={false}
+                  strokeDasharray="5 3"
+                  activeDot={{
+                    r: 4,
+                    fill: '#818cf8',
+                    stroke: '#080808',
+                    strokeWidth: 2
+                  }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </div>

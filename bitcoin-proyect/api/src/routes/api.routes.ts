@@ -63,4 +63,37 @@ router.get('/metrics', async (_req, res) => {
   }
 })
 
+router.get('/forecast', async (_req, res) => {
+  try {
+    const modelPath = path.join(MODEL_DIR, 'modelo.h5')
+
+    if (!existsSync(modelPath)) {
+      await spawnPython('preprocess.py')
+      await spawnPython('train.py')
+    }
+
+    const output = await spawnPython('predict.py', ['--forecast'])
+    res.json(JSON.parse(output))
+  } catch (err) {
+    res.status(500).json({ error: String(err) })
+  }
+})
+
+router.get('/loss', async (_req, res) => {
+  try {
+    const lossPath = path.join(MODEL_DIR, 'loss_data.json')
+
+    if (!existsSync(lossPath)) {
+      // si no existe, entrenar primero
+      await spawnPython('preprocess.py')
+      await spawnPython('train.py')
+    }
+
+    const output = await spawnPython('predict.py', ['--loss'])
+    res.json(JSON.parse(output))
+  } catch (err) {
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 export default router
