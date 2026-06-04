@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import tensorflow as tf
+import json as _json
 tf.get_logger().setLevel("ERROR")
 
 from tensorflow.keras.models import load_model
@@ -144,6 +145,17 @@ def run_api_mode(flag: str) -> None:
     elif flag == "--metrics":
         mae = get_metrics()
         print(json.dumps({"mae": mae}))
+
+    elif flag == "--forecast":
+        fechas, precios = forecast_next_days()
+        print(json.dumps({"dates": fechas, "prices": precios}))
+    
+    elif flag == "--loss":
+
+        with open("loss_data.json", "r") as f:
+            data = _json.load(f)
+        epochs = list(range(1, len(data["train"]) + 1))
+        print(_json.dumps({"epochs": epochs, "train": data["train"], "val": data["val"]}))
 
     else:
         print(json.dumps({"error": f"flag desconocido: {flag}"}), file=sys.stderr)

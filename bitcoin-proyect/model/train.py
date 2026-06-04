@@ -33,6 +33,17 @@ def build_model(window: int = 60) -> Sequential:
 # plot_loss(history) -> None
 # genera y guarda la grafica de curva de aprendizaje (loss de entrenamiento vs validacion)
 def plot_loss(history):
+    import json
+
+    # guardar datos como JSON para la API
+    loss_data = {
+        "train": history.history["loss"],
+        "val":   history.history["val_loss"]
+    }
+    with open("loss_data.json", "w") as f:
+        json.dump(loss_data, f)
+
+    # grafica PNG (sin cambios)
     plt.figure(figsize=(10, 4))
     plt.plot(history.history["loss"],     label="Entrenamiento")
     plt.plot(history.history["val_loss"], label="Validacion")
@@ -43,6 +54,7 @@ def plot_loss(history):
     plt.tight_layout()
     plt.savefig("loss_curve.png")
     print("  Grafica guardada en loss_curve.png")
+    print("  Datos guardados en loss_data.json")
 
 
 # -----------------------------------------------------------------------
