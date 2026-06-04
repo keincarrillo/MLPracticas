@@ -2,8 +2,7 @@
 model/venv/
 
 # Archivos generados por el modelo
-model/modelo.h5
-model/scaler.pkl
+
 model/loss_curve.png
 model/predictions.png
 
