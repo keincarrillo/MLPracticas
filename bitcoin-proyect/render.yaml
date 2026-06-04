@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: bitcoin-api
+    runtime: node
+    rootDir: bitcoin-proyect
+    buildCommand: pip3 install -r model/requirements.txt && cd api && bun install
+    startCommand: cd api && bun run start
+    envVars:
+      - key: PYTHON_BIN
+        value: python3
