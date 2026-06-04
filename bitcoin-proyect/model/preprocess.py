@@ -1,31 +1,46 @@
 # preprocess.py
+# pipeline de descarga, normalización y construcción de secuencias
+# cada función tiene una sola responsabilidad; ninguna mezcla I/O con transformación
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
 from sklearn.preprocessing import MinMaxScaler
 import pickle
 
-TICKER      = "BTC-USD"
-YEARS       = 3
-WINDOW      = 60
-TRAIN_SPLIT = 0.8
-SCALER_PATH = "scaler.pkl"
+from config import TICKER, YEARS, WINDOW, TRAIN_SPLIT, SCALER_PATH
 
+
+# ── Descarga ──────────────────────────────────────────────────────────────────
 
 # download_data() -> pd.DataFrame
-# descarga los ultimos YEARS años de precio de cierre de Bitcoin desde Yahoo Finance
+# descarga los últimos YEARS años de precio de cierre de Bitcoin desde Yahoo Finance
 # elimina filas con valores nulos y retorna solo la columna Close
+# lanza RuntimeError si la descarga falla o retorna un DataFrame vacío
 def download_data() -> pd.DataFrame:
-    df = yf.download(TICKER, period=f"{YEARS}y", interval="1d", auto_adjust=True)
+    try:
+        df = yf.download(TICKER, period=f"{YEARS}y", interval="1d", auto_adjust=True)
+    except Exception as exc:
+        raise RuntimeError(f"Error al descargar datos de {TICKER}: {exc}") from exc
+
     df = df[["Close"]].dropna()
+
+    if df.empty:
+        raise RuntimeError(
+            f"Yahoo Finance devolvió un DataFrame vacío para {TICKER}. "
+            "Verifica la conexión o el ticker."
+        )
+
     return df
 
 
-# normalize(data: np.ndarray) -> tuple[np.ndarray, MinMaxScaler]
-# normaliza los precios al rango [0, 1] usando MinMaxScaler
-# guarda el scaler en disco para poder invertir la transformacion en predict.py
-# nota: llamar esta funcion sobreescribe el scaler guardado — solo debe llamarse en train.py
-def normalize(data: np.ndarray) -> tuple[np.ndarray, MinMaxScaler]:
+# ── Normalización ─────────────────────────────────────────────────────────────
+
+# fit_and_save_scaler(data) -> tuple[np.ndarray, MinMaxScaler]
+# ajusta un MinMaxScaler sobre los datos y lo guarda en disco
+# separado de transform() para dejar claro que este es el único punto
+# donde el scaler se "aprende" — solo debe llamarse desde train.py
+def fit_and_save_scaler(data: np.ndarray) -> tuple[np.ndarray, MinMaxScaler]:
     scaler = MinMaxScaler()
     scaled = scaler.fit_transform(data)
     with open(SCALER_PATH, "wb") as f:
@@ -33,55 +48,61 @@ def normalize(data: np.ndarray) -> tuple[np.ndarray, MinMaxScaler]:
     return scaled, scaler
 
 
-# build_sequences(scaled: np.ndarray, window: int) -> tuple[np.ndarray, np.ndarray]
+# load_scaler() -> MinMaxScaler
+# carga el scaler previamente ajustado y guardado en disco
+# usar esta función en predict.py garantiza que no se sobreescriba el scaler
+# lanza FileNotFoundError si el scaler no existe todavía
+def load_scaler() -> MinMaxScaler:
+    try:
+        with open(SCALER_PATH, "rb") as f:
+            return pickle.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"Scaler no encontrado en '{SCALER_PATH}'. "
+            "Ejecuta preprocess.py antes de predecir."
+        )
+
+
+# ── Secuencias ────────────────────────────────────────────────────────────────
+
+# build_sequences(scaled, window) -> tuple[np.ndarray, np.ndarray]
 # construye pares (X, y) con ventana deslizante de tamaño window
-# X[i] contiene los ultimos window precios normalizados, y[i] es el precio siguiente
-def build_sequences(scaled: np.ndarray, window: int = WINDOW):
+# X[i] contiene los últimos window precios normalizados, y[i] es el precio siguiente
+def build_sequences(
+    scaled: np.ndarray, window: int = WINDOW
+) -> tuple[np.ndarray, np.ndarray]:
     X, y = [], []
     for i in range(window, len(scaled)):
-        X.append(scaled[i - window:i, 0])
+        X.append(scaled[i - window : i, 0])
         y.append(scaled[i, 0])
     return np.array(X), np.array(y)
 
 
 # split_and_reshape(X, y, split) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
-# divide en conjuntos train/test segun la proporcion split (80/20 por defecto)
+# divide en conjuntos train/test según la proporción split (80/20 por defecto)
 # hace reshape a (N, window, 1) requerido por la capa LSTM
-def split_and_reshape(X: np.ndarray, y: np.ndarray, split: float = TRAIN_SPLIT):
+def split_and_reshape(
+    X: np.ndarray, y: np.ndarray, split: float = TRAIN_SPLIT
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     corte   = int(len(X) * split)
-    X_train = X[:corte]
-    X_test  = X[corte:]
+    X_train = X[:corte].reshape(-1, X.shape[1], 1)
+    X_test  = X[corte:].reshape(-1, X.shape[1], 1)
     y_train = y[:corte]
     y_test  = y[corte:]
-
-    X_train = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
-    X_test  = X_test.reshape((X_test.shape[0],   X_test.shape[1],  1))
-
     return X_train, X_test, y_train, y_test
 
 
-# load_scaler() -> MinMaxScaler
-# carga el scaler previamente guardado en disco por normalize()
-# usar esta funcion en predict.py garantiza que no se sobreescriba el scaler del entrenamiento
-def load_scaler() -> MinMaxScaler:
-    with open(SCALER_PATH, "rb") as f:
-        return pickle.load(f)
-
-
-# -----------------------------------------------------------------------
-# punto de entrada — verificacion del pipeline de preprocesamiento
-# -----------------------------------------------------------------------
+# ── Punto de entrada ──────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     print("Descargando datos...")
     df = download_data()
-    print(f"  {len(df)} registros descargados ({df.index[0].date()} -> {df.index[-1].date()})")
+    print(f"  {len(df)} registros ({df.index[0].date()} → {df.index[-1].date()})")
 
-    prices    = df["Close"].values.reshape(-1, 1)
-    scaled, _ = normalize(prices)
-    print(f"  Scaler guardado en {SCALER_PATH}")
+    prices, scaler = fit_and_save_scaler(df["Close"].values.reshape(-1, 1))
+    print(f"  Scaler guardado en '{SCALER_PATH}'")
 
-    X, y = build_sequences(scaled)
+    X, y = build_sequences(prices)
     X_train, X_test, y_train, y_test = split_and_reshape(X, y)
 
     print(f"  X_train: {X_train.shape} | X_test: {X_test.shape}")
