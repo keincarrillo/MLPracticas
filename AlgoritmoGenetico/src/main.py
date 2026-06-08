@@ -1,4 +1,5 @@
 import json
+import random
 import sys
 from math import log2
 from modelo import (
@@ -8,273 +9,213 @@ from modelo import (
 from utils import (
     fitness, cromosoma_a_gaps, proporcion_promedio,
     gaps_knuth, gaps_ciura, gaps_tokuda,
-    gaps_shell_original, gaps_hibbard, gaps_sedgewick
+    gaps_shell_original, gaps_hibbard, gaps_sedgewick,
+    shell_sort_real
 )
 
 # --- carga de configuracion ---
 with open('../data/config.json', encoding='utf-8') as archivo:
     config = json.load(archivo)
 
-n                = config['n_elementos']
+# n para el AG (modelo teorico, puede ser grande)
+n_teorico        = config['n_elementos']
+
+# n real para ordenar (10^7 es manejable en RAM: ~80 MB con enteros Python)
+N_REAL           = 10_000_000
+
 tam_poblacion    = config['tam_poblacion']
 num_generaciones = config['num_generaciones']
 long_cromosoma   = config['long_cromosoma']
 semilla          = config['semilla']
 
 # -----------------------------------------------------------------------
-# funciones de impresion
+# utilidades de impresion
 # -----------------------------------------------------------------------
 
-ANCHO = 72
+ANCHO = 76
 
-def separador(caracter="-"):
-    print(caracter * ANCHO)
+def separador(c="-"):   print(c * ANCHO)
+def titulo(texto):      separador("="); print(f"  {texto}"); separador("=")
+def seccion(texto):     print(); separador(); print(f"  {texto}"); separador()
 
-def titulo(texto):
-    separador("=")
-    print(f"  {texto}")
-    separador("=")
-
-def seccion(texto):
-    print()
-    separador()
-    print(f"  {texto}")
-    separador()
-
-def tabla_fila(etiqueta, valor, ancho_etiqueta=38):
-    print(f"  {etiqueta:<{ancho_etiqueta}}: {valor}")
+def tabla_fila(etiqueta, valor, ancho=40):
+    print(f"  {etiqueta:<{ancho}}: {valor}")
 
 # -----------------------------------------------------------------------
-# reporte de configuracion
+# configuracion
 # -----------------------------------------------------------------------
 
+# imprimir_configuracion() -> None
+# imprime el encabezado con todos los parametros del experimento
 def imprimir_configuracion():
     titulo("ALGORITMO GENETICO PARA SHELL SORT  —  Optimizacion de gaps")
     print()
-    tabla_fila("Tamano del arreglo (n)", f"{n:.2e}  ({int(log2(n)):.0f} bits aprox)")
-    tabla_fila("Tamano de poblacion",    tam_poblacion)
-    tabla_fila("Numero de generaciones", num_generaciones)
-    tabla_fila("Longitud del cromosoma", f"{long_cromosoma} genes (gaps)")
-    tabla_fila("Tasa de mutacion",       f"{config['tasa_mutacion'] * 100:.0f} %")
-    tabla_fila("Tasa de cruce",          f"{config['tasa_cruce'] * 100:.0f} %")
-    tabla_fila("Metodo de seleccion",    "Ruleta (proporcional al fitness)")
-    tabla_fila("Semilla aleatoria",      semilla if semilla is not None else "ninguna (aleatorio)")
+    tabla_fila("n teorico (modelo fitness)",     f"{n_teorico:.2e}")
+    tabla_fila("n real (arreglo a ordenar)",     f"{N_REAL:,}  (10^7 elementos)")
+    tabla_fila("Memoria estimada del arreglo",   f"~{N_REAL * 28 / 1_048_576:.0f} MB  (enteros Python)")
+    tabla_fila("Tamano de poblacion",            tam_poblacion)
+    tabla_fila("Numero de generaciones",         num_generaciones)
+    tabla_fila("Longitud del cromosoma",         f"{long_cromosoma} genes (gaps)")
+    tabla_fila("Tasa de mutacion",               f"{config['tasa_mutacion'] * 100:.0f} %")
+    tabla_fila("Tasa de cruce",                  f"{config['tasa_cruce'] * 100:.0f} %")
+    tabla_fila("Semilla aleatoria",              semilla)
     print()
 
 # -----------------------------------------------------------------------
-# evolucion con log por generacion
+# evolucion
 # -----------------------------------------------------------------------
 
+# ejecutar_ag() -> tuple[list[int], float, int, list[float], list[dict]]
+# ejecuta el algoritmo genetico completo y retorna el mejor individuo, su fitness,
+# la generacion donde se encontro, el historial de fitness y el historial de estadisticas
 def ejecutar_ag():
-    poblacion = inicializar_poblacion(tam_poblacion, long_cromosoma, n, semilla)
-    fitnesses = evaluar_poblacion(poblacion, n)
+    poblacion = inicializar_poblacion(tam_poblacion, long_cromosoma, n_teorico, semilla)
+    fitnesses = evaluar_poblacion(poblacion, n_teorico)
 
     mejor_global, fitness_global = mejor_individuo(poblacion, fitnesses)
-    historial_fitness            = []
-    historial_estadisticas       = []
-    generacion_mejor             = 0
+    historial_fitness      = []
+    historial_estadisticas = []
+    generacion_mejor       = 0
 
-    seccion("PROGRESO DE EVOLUCION")
+    seccion("PROGRESO DE EVOLUCION  (fitness teorico)")
     encabezado = f"  {'Gen':>5}  {'Mejor fitness':>16}  {'Prom. poblacion':>16}  {'Desv. std':>14}  {'Gaps elite'}"
     print(encabezado)
     separador()
 
-    for generacion in range(1, num_generaciones + 1):
-
-        poblacion = evolucionar(poblacion, fitnesses, config, n)
-        fitnesses = evaluar_poblacion(poblacion, n)
+    for gen in range(1, num_generaciones + 1):
+        poblacion = evolucionar(poblacion, fitnesses, config, n_teorico)
+        fitnesses = evaluar_poblacion(poblacion, n_teorico)
         stats     = estadisticas_generacion(fitnesses)
+        cand, fc  = mejor_individuo(poblacion, fitnesses)
 
-        candidato, fit_candidato = mejor_individuo(poblacion, fitnesses)
-
-        if fit_candidato < fitness_global:
-            fitness_global   = fit_candidato
-            mejor_global     = candidato[:]
-            generacion_mejor = generacion
+        if fc < fitness_global:
+            fitness_global   = fc
+            mejor_global     = cand[:]
+            generacion_mejor = gen
 
         historial_fitness.append(fitness_global)
         historial_estadisticas.append(stats)
 
-        # imprimir cada 25 generaciones, la primera y la ultima
-        if generacion % 25 == 0 or generacion == 1 or generacion == num_generaciones:
+        if gen % 25 == 0 or gen == 1 or gen == num_generaciones:
             gaps_str = str(cromosoma_a_gaps(mejor_global))
-            print(f"  {generacion:>5}  {fitness_global:>16.4e}  {stats['promedio']:>16.4e}  {stats['desviacion']:>14.4e}  {gaps_str}")
+            print(f"  {gen:>5}  {fitness_global:>16.4e}  {stats['promedio']:>16.4e}  {stats['desviacion']:>14.4e}  {gaps_str}")
 
     return mejor_global, fitness_global, generacion_mejor, historial_fitness, historial_estadisticas
 
 # -----------------------------------------------------------------------
-# reporte del resultado del AG
+# generar arreglo real
 # -----------------------------------------------------------------------
 
-def imprimir_resultado_ag(mejor_global, fitness_global, generacion_mejor, historial_fitness):
-    gaps_finales = cromosoma_a_gaps(mejor_global)
+# generar_arreglo(semilla_arr: int | None) -> list[int]
+# genera un arreglo aleatorio de N_REAL enteros con semilla reproducible
+def generar_arreglo(semilla_arr=None):
+    rng = random.Random(semilla_arr)
+    return [rng.randint(0, N_REAL * 10) for _ in range(N_REAL)]
 
-    seccion("RESULTADO DEL ALGORITMO GENETICO")
-    tabla_fila("Mejor secuencia de gaps",        str(gaps_finales))
-    tabla_fila("Numero de gaps",                 len(gaps_finales))
-    tabla_fila("Gap mayor (primer paso)",        f"{gaps_finales[0]:.2e}")
-    tabla_fila("Gap menor (ultimo paso)",        gaps_finales[-1])
-    tabla_fila("Ratio promedio entre gaps",      f"{proporcion_promedio(gaps_finales):.4f}  (optimo teorico ~2.3)")
-    tabla_fila("Fitness (comparaciones est.)",   f"{fitness_global:.6e}")
-    tabla_fila("Generacion donde se encontro",  f"{generacion_mejor} de {num_generaciones}")
-    tabla_fila("Mejora desde gen 1 a gen final", f"{((historial_fitness[0] - fitness_global) / historial_fitness[0] * 100):.2f} %")
+# -----------------------------------------------------------------------
+# ordenamiento real con metricas completas
+# -----------------------------------------------------------------------
+
+# medir_ordenamiento_real(gaps: list[int], arreglo_base: list[int]) -> dict
+# copia el arreglo base y lo ordena con shell_sort_real para no modificar el original
+def medir_ordenamiento_real(gaps, arreglo_base):
+    arr  = arreglo_base[:]
+    return shell_sort_real(arr, gaps)
+
+# imprimir_metricas_reales(nombre: str, gaps: list[int], metricas: dict) -> None
+# imprime el detalle completo de comparaciones, intercambios, tiempo y memoria de un ordenamiento real
+def imprimir_metricas_reales(nombre, gaps, metricas):
+    seccion(f"ORDENAMIENTO REAL  —  {nombre}")
+    tabla_fila("Gaps utilizados",           str(gaps))
+    tabla_fila("Numero de gaps",            len(gaps))
+    tabla_fila("Comparaciones reales",      f"{metricas['comparaciones']:,}")
+    tabla_fila("Intercambios reales",       f"{metricas['intercambios']:,}")
+    tabla_fila("Tiempo de ejecucion",       f"{metricas['tiempo_ms']:.2f} ms  ({metricas['tiempo_ms']/1000:.3f} s)")
+    tabla_fila("Memoria pico (tracemalloc)",f"{metricas['memoria_kb']:.1f} KB")
+    tabla_fila("Arreglo correctamente ord.",f"{'SI' if metricas['ordenado'] else 'NO  *** ERROR ***'}")
+    tabla_fila("Comparaciones / n",         f"{metricas['comparaciones'] / N_REAL:.2f}")
+    tabla_fila("Comparaciones / n·log2(n)", f"{metricas['comparaciones'] / (N_REAL * log2(N_REAL)):.4f}")
     print()
-
-    print("  Secuencia detallada:")
+    print("  Detalle por pasada:")
     separador()
-    for i, g in enumerate(gaps_finales):
-        ratio_str = ""
-        if i < len(gaps_finales) - 1:
-            ratio = g / gaps_finales[i + 1]
-            ratio_str = f"  (ratio con siguiente: {ratio:.3f})"
-        print(f"    h[{i + 1:>2}] = {g:>15,.0f}{ratio_str}")
+    print(f"  {'Paso':>4}  {'Gap':>12}  {'Comparaciones':>16}  {'Intercambios':>14}  {'% comps':>8}")
+    separador()
+    total_comp = metricas['comparaciones']
+    for i, paso in enumerate(metricas['pasos'], 1):
+        pct = paso['comparaciones'] / total_comp * 100 if total_comp > 0 else 0
+        print(f"  {i:>4}  {paso['gap']:>12,}  {paso['comparaciones']:>16,}  {paso['intercambios']:>14,}  {pct:>7.2f}%")
 
 # -----------------------------------------------------------------------
-# comparacion con secuencias clasicas
+# comparacion real entre secuencias
 # -----------------------------------------------------------------------
 
-def imprimir_comparacion(fitness_ag, gaps_ag):
+# comparacion_real_completa(gaps_ag: list[int], arreglo_base: list[int]) -> list[tuple]
+# ordena el arreglo real con el AG y con todas las secuencias clasicas, imprime tabla comparativa
+# retorna lista de tuplas (nombre, gaps, metricas) ordenada por comparaciones reales
+def comparacion_real_completa(gaps_ag, arreglo_base):
     secuencias = {
         "AG (este resultado)" : gaps_ag,
-        "Shell original"      : gaps_shell_original(n),
+        "Shell original"      : gaps_shell_original(N_REAL),
         "Hibbard"             : gaps_hibbard(),
-        "Knuth"               : gaps_knuth(n),
+        "Knuth"               : gaps_knuth(N_REAL),
         "Sedgewick"           : gaps_sedgewick(),
         "Tokuda"              : gaps_tokuda(),
         "Ciura"               : gaps_ciura(),
     }
 
-    seccion("COMPARACION CON SECUENCIAS CLASICAS")
-    encabezado = f"  {'Secuencia':<20}  {'Num gaps':>8}  {'Fitness':>16}  {'vs AG':>12}  {'Ratio prom':>10}"
-    print(encabezado)
-    separador()
+    seccion("COMPARACION REAL ENTRE SECUENCIAS  (arreglo de 10^7 elementos)")
+    print("  Ordenando con cada secuencia... (esto puede tardar varios minutos)")
+    print()
 
     resultados = []
     for nombre, gaps in secuencias.items():
-        fit    = fitness(gaps, n)
-        ratio  = proporcion_promedio(gaps)
-        ngaps  = len(gaps)
+        sys.stdout.write(f"  Ordenando con {nombre:<22}...")
+        sys.stdout.flush()
+        m = medir_ordenamiento_real(gaps, arreglo_base)
+        sys.stdout.write(f"  {m['tiempo_ms']:.0f} ms\n")
+        sys.stdout.flush()
+        resultados.append((nombre, gaps, m))
+
+    # ordenar por comparaciones reales de menor a mayor
+    resultados.sort(key=lambda x: x[2]['comparaciones'])
+
+    print()
+    separador()
+    hdr = f"  {'Secuencia':<22}  {'Gaps':>5}  {'Comparaciones':>16}  {'Intercambios':>14}  {'Tiempo (ms)':>12}  {'vs AG':>10}"
+    print(hdr)
+    separador()
+
+    comp_ag = next(m['comparaciones'] for n, _, m in resultados if n == "AG (este resultado)")
+
+    for nombre, gaps, m in resultados:
         if nombre == "AG (este resultado)":
-            diff_str = "  (referencia)"
+            diff_str = "referencia"
         else:
-            diff = ((fit - fitness_ag) / fitness_ag) * 100
-            signo    = "+" if diff >= 0 else ""
-            diff_str = f"  {signo}{diff:.2f} %"
-        resultados.append((nombre, ngaps, fit, diff_str, ratio))
+            diff = (m['comparaciones'] - comp_ag) / comp_ag * 100
+            signo = "+" if diff >= 0 else ""
+            diff_str = f"{signo}{diff:.1f}%"
+        ok = "OK" if m['ordenado'] else "ERR"
+        print(f"  {nombre:<22}  {len(gaps):>5}  {m['comparaciones']:>16,}  {m['intercambios']:>14,}  {m['tiempo_ms']:>11.0f}  {diff_str:>10}  {ok}")
 
-    # ordenar por fitness
-    resultados.sort(key=lambda x: x[2])
-
-    for nombre, ngaps, fit, diff_str, ratio in resultados:
-        print(f"  {nombre:<20}  {ngaps:>8}  {fit:>16.4e}  {diff_str:>12}  {ratio:>10.3f}")
-
-# -----------------------------------------------------------------------
-# analisis del historial de evolucion
-# -----------------------------------------------------------------------
-
-def imprimir_analisis_historial(historial_fitness, historial_estadisticas):
-    seccion("ANALISIS DEL HISTORIAL DE EVOLUCION")
-
-    n_hist = len(historial_fitness)
-
-    # calcular en que generaciones hubo mejoras significativas
-    mejoras = []
-    fit_anterior = historial_fitness[0]
-    for i, f in enumerate(historial_fitness):
-        if f < fit_anterior * 0.999:
-            mejoras.append((i + 1, f, fit_anterior, (fit_anterior - f) / fit_anterior * 100))
-            fit_anterior = f
-
-    tabla_fila("Total de mejoras registradas",    len(mejoras))
-    tabla_fila("Fitness generacion 1",            f"{historial_fitness[0]:.4e}")
-    tabla_fila("Fitness generacion final",        f"{historial_fitness[-1]:.4e}")
-    tabla_fila("Reduccion total del fitness",     f"{((historial_fitness[0] - historial_fitness[-1]) / historial_fitness[0] * 100):.4f} %")
-
-    # convergencia: cuantas generaciones sin mejora al final
-    sin_mejora = 0
-    fit_ref    = historial_fitness[-1]
-    for f in reversed(historial_fitness):
-        if f == fit_ref:
-            sin_mejora += 1
-        else:
-            break
-    tabla_fila("Generaciones sin mejora al final", sin_mejora)
-    tabla_fila("Convergencia alcanzada en gen",    n_hist - sin_mejora)
-    print()
-
-    if mejoras:
-        print("  Mejoras significativas (>0.1% de reduccion):")
-        separador()
-        print(f"  {'Gen':>6}  {'Fitness nuevo':>16}  {'Fitness anterior':>16}  {'Mejora %':>10}")
-        separador()
-        for gen, nuevo, anterior, pct in mejoras[:20]:
-            print(f"  {gen:>6}  {nuevo:>16.4e}  {anterior:>16.4e}  {pct:>9.4f}%")
-        if len(mejoras) > 20:
-            print(f"  ... y {len(mejoras) - 20} mejoras mas")
-
-    # perfil de diversidad: desviacion promedio de la poblacion por tramos
-    print()
-    print("  Diversidad de la poblacion por tramos (desviacion estandar del fitness):")
-    separador()
-    tramo = max(1, n_hist // 10)
-    print(f"  {'Tramo':<20}  {'Gen inicio':>10}  {'Gen fin':>10}  {'Desv. prom':>14}")
-    separador()
-    for i in range(0, n_hist, tramo):
-        fin        = min(i + tramo, n_hist)
-        desv_tramo = [s['desviacion'] for s in historial_estadisticas[i:fin]]
-        desv_prom  = sum(desv_tramo) / len(desv_tramo)
-        print(f"  {i // tramo + 1:<20}  {i + 1:>10}  {fin:>10}  {desv_prom:>14.4e}")
-
-# -----------------------------------------------------------------------
-# analisis teorico
-# -----------------------------------------------------------------------
-
-def imprimir_analisis_teorico(gaps_ag, fitness_ag):
-    seccion("ANALISIS TEORICO DE LA SECUENCIA ENCONTRADA")
-
-    gaps = cromosoma_a_gaps(gaps_ag)
-
-    tabla_fila("n (tamano del arreglo)", f"{n:.4e}")
-    tabla_fila("log2(n)",                f"{log2(n):.2f}")
-    tabla_fila("sqrt(n)",                f"{n**0.5:.4e}")
-    print()
-
-    print("  Costo estimado por pasada (n * sqrt(h)):")
-    separador()
-    print(f"  {'Paso':>5}  {'Gap h':>15}  {'sqrt(h)':>12}  {'Comparaciones':>18}  {'% del total':>12}")
-    separador()
-
-    from math import sqrt
-    costos = [(h, n * sqrt(h)) for h in sorted(gaps, reverse=True)]
-    total  = sum(c for _, c in costos)
-
-    for paso, (h, costo) in enumerate(costos, 1):
-        pct = costo / total * 100
-        print(f"  {paso:>5}  {h:>15,.0f}  {sqrt(h):>12.2f}  {costo:>18.4e}  {pct:>11.2f}%")
-
-    separador()
-    print(f"  {'TOTAL':>5}  {'':>15}  {'':>12}  {total:>18.4e}  {'100.00%':>12}")
-
-    print()
-    tabla_fila("Complejidad estimada total",       f"{fitness_ag:.4e} comparaciones")
-    tabla_fila("Para referencia: n log2(n)",       f"{n * log2(n):.4e}  (QuickSort ideal)")
-    tabla_fila("Factor vs QuickSort ideal",        f"{fitness_ag / (n * log2(n)):.4f} x")
+    return resultados
 
 # -----------------------------------------------------------------------
 # resumen ejecutivo
 # -----------------------------------------------------------------------
 
-def imprimir_resumen(gaps_ag, fitness_ag):
+# imprimir_resumen_final(gaps_ag: list[int], metricas_ag: dict) -> None
+# imprime el resumen ejecutivo con la secuencia optima y sus metricas reales
+def imprimir_resumen_final(gaps_ag, metricas_ag):
     gaps = cromosoma_a_gaps(gaps_ag)
-
     seccion("RESUMEN EJECUTIVO")
-    print(f"  La secuencia optima encontrada por el AG para n = {n:.2e} es:")
-    print()
+    print(f"  Secuencia optima encontrada por el AG:")
     print(f"  {gaps}")
     print()
-    print(f"  Con {len(gaps)} gaps y un fitness de {fitness_ag:.4e} comparaciones estimadas.")
-    print(f"  El ratio promedio entre gaps consecutivos es {proporcion_promedio(gaps):.3f}")
-    print(f"  (el ratio teoricamente optimo ronda 2.2 - 2.5).")
+    print(f"  Ordenando {N_REAL:,} elementos aleatorios:")
+    print(f"    - Comparaciones : {metricas_ag['comparaciones']:,}")
+    print(f"    - Intercambios  : {metricas_ag['intercambios']:,}")
+    print(f"    - Tiempo        : {metricas_ag['tiempo_ms']:.2f} ms")
+    print(f"    - Ratio prom.   : {proporcion_promedio(gaps):.3f}  (optimo ~2.3)")
     print()
     separador("=")
 
@@ -286,12 +227,33 @@ if __name__ == "__main__":
 
     imprimir_configuracion()
 
+    # --- fase 1: ejecutar el AG con modelo teorico para encontrar los gaps ---
     mejor_global, fitness_global, generacion_mejor, historial_fitness, historial_stats = ejecutar_ag()
-
     gaps_finales = cromosoma_a_gaps(mejor_global)
 
-    imprimir_resultado_ag(mejor_global, fitness_global, generacion_mejor, historial_fitness)
-    imprimir_comparacion(fitness_global, gaps_finales)
-    imprimir_analisis_historial(historial_fitness, historial_stats)
-    imprimir_analisis_teorico(gaps_finales, fitness_global)
-    imprimir_resumen(gaps_finales, fitness_global)
+    print()
+    seccion("MEJOR SECUENCIA ENCONTRADA POR EL AG")
+    tabla_fila("Gaps", str(gaps_finales))
+    tabla_fila("Num gaps", len(gaps_finales))
+    tabla_fila("Fitness teorico", f"{fitness_global:.4e}")
+    tabla_fila("Generacion", f"{generacion_mejor} de {num_generaciones}")
+    tabla_fila("Ratio prom entre gaps", f"{proporcion_promedio(gaps_finales):.4f}")
+
+    # --- fase 2: generar arreglo real de 10^7 elementos ---
+    print()
+    seccion("GENERANDO ARREGLO REAL DE 10^7 ELEMENTOS")
+    import time
+    t0 = time.perf_counter()
+    print("  Generando arreglo aleatorio...", end=" ", flush=True)
+    arreglo_base = generar_arreglo(semilla_arr=semilla)
+    print(f"listo en {(time.perf_counter()-t0)*1000:.0f} ms")
+    print(f"  Elementos: {len(arreglo_base):,}")
+    print(f"  Rango de valores: [{min(arreglo_base[:1000])}, {max(arreglo_base[:1000])}] (muestra de 1000)")
+
+    # --- fase 3: ordenamiento real con el AG y comparacion contra secuencias clasicas ---
+    metricas_ag = medir_ordenamiento_real(gaps_finales, arreglo_base)
+    imprimir_metricas_reales("AG (este resultado)", gaps_finales, metricas_ag)
+
+    resultados = comparacion_real_completa(gaps_finales, arreglo_base)
+
+    imprimir_resumen_final(gaps_finales, metricas_ag)

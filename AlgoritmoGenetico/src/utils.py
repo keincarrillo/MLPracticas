@@ -1,3 +1,5 @@
+import time
+import tracemalloc
 from math import sqrt, log2
 
 
@@ -17,7 +19,6 @@ def comparaciones_shell(gaps, n):
 # fitness(cromosoma: list[int], n: float) -> float
 # calcula el costo de una secuencia de gaps (menor es mejor)
 # penaliza gaps invalidos, ausencia de gap=1, y malas proporciones entre gaps consecutivos
-# el ratio empiricamente optimo entre gaps consecutivos ronda 2.2 - 2.5 (usamos 2.3 como centro)
 def fitness(cromosoma, n):
     gaps = sorted(set(g for g in cromosoma if g >= 1), reverse=True)
 
@@ -35,14 +36,66 @@ def fitness(cromosoma, n):
 
     costo = comparaciones_shell(gaps, n)
 
-    # penalizacion por proporciones entre gaps consecutivos
-    # empiricamente el ratio optimo ronda 2.2-2.5
     penalizacion_ratio = 0.0
     for i in range(len(gaps) - 1):
         ratio = gaps[i] / gaps[i + 1]
         penalizacion_ratio += abs(ratio - 2.3) * (n * 0.01)
 
     return costo + penalizacion_ratio
+
+
+# shell_sort_real(arr: list[int], gaps: list[int]) -> dict
+# ordena el arreglo arr en su lugar usando Shell Sort con la secuencia de gaps dada
+# retorna un diccionario con comparaciones, intercambios, tiempo_ms, memoria_kb,
+# pasos (detalle por gap) y ordenado (verificacion de correctitud)
+def shell_sort_real(arr, gaps):
+    gaps_ord = sorted(set(gaps), reverse=True)
+    if gaps_ord[-1] != 1:
+        gaps_ord.append(1)
+
+    comparaciones  = 0
+    intercambios   = 0
+    detalle_pasos  = []
+
+    tracemalloc.start()
+    inicio = time.perf_counter()
+
+    for h in gaps_ord:
+        comp_pasada  = 0
+        inter_pasada = 0
+        n = len(arr)
+        for i in range(h, n):
+            temp = arr[i]
+            j = i
+            while j >= h:
+                comp_pasada += 1
+                if arr[j - h] > temp:
+                    arr[j] = arr[j - h]
+                    j -= h
+                    inter_pasada += 1
+                else:
+                    break
+            arr[j] = temp
+        comparaciones += comp_pasada
+        intercambios  += inter_pasada
+        detalle_pasos.append({
+            'gap': h,
+            'comparaciones': comp_pasada,
+            'intercambios': inter_pasada
+        })
+
+    fin     = time.perf_counter()
+    mem_actual, mem_pico = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    return {
+        'comparaciones' : comparaciones,
+        'intercambios'  : intercambios,
+        'tiempo_ms'     : (fin - inicio) * 1000,
+        'memoria_kb'    : mem_pico / 1024,
+        'pasos'         : detalle_pasos,
+        'ordenado'      : arr == sorted(arr)   # verificacion de correctitud
+    }
 
 
 # gaps_knuth(n: float) -> list[int]
