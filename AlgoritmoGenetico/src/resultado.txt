@@ -1,0 +1,82 @@
+============================================================================
+  ALGORITMO GENETICO PARA SHELL SORT  —  Optimizacion de gaps
+============================================================================
+
+  n teorico (modelo fitness)              : 1.00e+10
+  n real (arreglo a ordenar)              : 10,000,000  (10^7 elementos)
+  Memoria estimada del arreglo            : ~76 MB  (long long, array.array)
+  Tamano de poblacion                     : 60
+  Numero de generaciones                  : 300
+  Longitud del cromosoma                  : 8 genes (gaps)
+  Tasa de mutacion                        : 15 %
+  Tasa de cruce                           : 85 %
+  Semilla aleatoria                       : 42
+
+
+----------------------------------------------------------------------------
+  PROGRESO DE EVOLUCION  (fitness teorico)
+----------------------------------------------------------------------------
+    Gen     Mejor fitness   Prom. poblacion       Desv. std  Gaps elite
+----------------------------------------------------------------------------
+      1        1.0082e+12        1.4427e+12      2.2129e+11  [1825, 564, 126, 103, 29, 12, 9, 1]
+     25        2.3944e+11        3.5998e+11      5.4907e+10  [45, 33, 27, 9, 5, 1]
+     50        1.0627e+11        2.3887e+11      5.7770e+10  [45, 8, 1]
+     75        1.0442e+11        2.3239e+11      5.6524e+10  [45, 7, 1]
+    100        9.3274e+10        2.1764e+11      6.0478e+10  [45, 2, 1]
+    125        8.1352e+10        1.8230e+11      5.9765e+10  [45, 1]
+    150        8.1352e+10        1.7561e+11      5.5889e+10  [45, 1]
+    175        8.1352e+10        1.9404e+11      5.2432e+10  [45, 1]
+    200        8.1352e+10        1.6634e+11      5.5328e+10  [45, 1]
+    225        8.1352e+10        1.8638e+11      6.0451e+10  [45, 1]
+    250        8.1352e+10        1.8551e+11      6.0260e+10  [45, 1]
+    275        8.1352e+10        1.7416e+11      6.6245e+10  [45, 1]
+    300        8.1352e+10        1.8645e+11      5.4940e+10  [45, 1]
+
+
+----------------------------------------------------------------------------
+  MEJOR SECUENCIA ENCONTRADA POR EL AG
+----------------------------------------------------------------------------
+  Gaps                                    : [45, 1]
+  Num gaps                                : 2
+  Fitness teorico                         : 8.1352e+10
+  Generacion                              : 112 de 300
+  Ratio prom entre gaps                   : 45.0000
+
+
+----------------------------------------------------------------------------
+  GENERANDO ARREGLO REAL DE 10^7 ELEMENTOS
+----------------------------------------------------------------------------
+  Generando arreglo aleatorio... listo en 3122 ms
+  Elementos: 10,000,000
+  Rango de valores: [54484, 99990728] (muestra de 1000)
+
+----------------------------------------------------------------------------
+  ORDENAMIENTO REAL  —  AG (este resultado)
+----------------------------------------------------------------------------
+  Gaps utilizados                         : [45, 1]
+  Numero de gaps                          : 2
+  Comparaciones reales                    : 605,810,488,605
+  Intercambios reales                     : 605,790,489,196
+  Tiempo de ejecucion                     : 906520.89 ms  (906.521 s)
+  Memoria pico (tracemalloc)              : 1.8 KB
+  Arreglo correctamente ord.              : SI
+  Comparaciones / n                       : 60581.05
+  Comparaciones / n·log2(n)               : 2605.2447
+
+  Detalle por pasada:
+----------------------------------------------------------------------------
+  Paso           Gap     Comparaciones    Intercambios   % comps
+----------------------------------------------------------------------------
+     1            45   555,634,692,515  555,624,693,101    91.72%
+     2             1    50,175,796,090  50,165,796,095     8.28%
+
+----------------------------------------------------------------------------
+  COMPARACION REAL ENTRE SECUENCIAS  (arreglo de 10^7 elementos)
+----------------------------------------------------------------------------
+  Ordenando con cada secuencia... (esto puede tardar varios minutos)
+
+  Ordenando con AG (este resultado)   ...  899614 ms
+  Ordenando con Shell original        ...  1086 ms
+  Ordenando con Hibbard               ...  1272 ms
+  Ordenando con Knuth                 ...  941 ms
+  Ordenando con Sedgewick             ...

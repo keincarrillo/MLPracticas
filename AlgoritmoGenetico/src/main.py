@@ -1,6 +1,7 @@
 import json
 import random
 import sys
+import array
 from math import log2
 from modelo import (
     inicializar_poblacion, evaluar_poblacion,
@@ -20,7 +21,7 @@ with open('../data/config.json', encoding='utf-8') as archivo:
 # n para el AG (modelo teorico, puede ser grande)
 n_teorico        = config['n_elementos']
 
-# n real para ordenar (10^7 es manejable en RAM: ~80 MB con enteros Python)
+# n real para ordenar (10^7 elementos como array.array de long long: ~80 MB)
 N_REAL           = 10_000_000
 
 tam_poblacion    = config['tam_poblacion']
@@ -52,7 +53,7 @@ def imprimir_configuracion():
     print()
     tabla_fila("n teorico (modelo fitness)",     f"{n_teorico:.2e}")
     tabla_fila("n real (arreglo a ordenar)",     f"{N_REAL:,}  (10^7 elementos)")
-    tabla_fila("Memoria estimada del arreglo",   f"~{N_REAL * 28 / 1_048_576:.0f} MB  (enteros Python)")
+    tabla_fila("Memoria estimada del arreglo",   f"~{N_REAL * 8 / 1_048_576:.0f} MB  (long long, array.array)")
     tabla_fila("Tamano de poblacion",            tam_poblacion)
     tabla_fila("Numero de generaciones",         num_generaciones)
     tabla_fila("Longitud del cromosoma",         f"{long_cromosoma} genes (gaps)")
@@ -106,20 +107,23 @@ def ejecutar_ag():
 # generar arreglo real
 # -----------------------------------------------------------------------
 
-# generar_arreglo(semilla_arr: int | None) -> list[int]
-# genera un arreglo aleatorio de N_REAL enteros con semilla reproducible
+# generar_arreglo(semilla_arr: int | None) -> array.array
+# genera un arreglo aleatorio de N_REAL long long usando array.array tipo 'q'
+# el tipo 'q' (signed long long) es directamente compatible con el buffer C
+# sin necesidad de conversion elemento a elemento
 def generar_arreglo(semilla_arr=None):
     rng = random.Random(semilla_arr)
-    return [rng.randint(0, N_REAL * 10) for _ in range(N_REAL)]
+    return array.array('q', (rng.randint(0, N_REAL * 10) for _ in range(N_REAL)))
 
 # -----------------------------------------------------------------------
 # ordenamiento real con metricas completas
 # -----------------------------------------------------------------------
 
-# medir_ordenamiento_real(gaps: list[int], arreglo_base: list[int]) -> dict
+# medir_ordenamiento_real(gaps: list[int], arreglo_base: array.array) -> dict
 # copia el arreglo base y lo ordena con shell_sort_real para no modificar el original
+# la copia de array.array es una operacion de memoria directa, sin overhead de Python
 def medir_ordenamiento_real(gaps, arreglo_base):
-    arr  = arreglo_base[:]
+    arr = array.array('q', arreglo_base)
     return shell_sort_real(arr, gaps)
 
 # imprimir_metricas_reales(nombre: str, gaps: list[int], metricas: dict) -> None
@@ -149,7 +153,7 @@ def imprimir_metricas_reales(nombre, gaps, metricas):
 # comparacion real entre secuencias
 # -----------------------------------------------------------------------
 
-# comparacion_real_completa(gaps_ag: list[int], arreglo_base: list[int]) -> list[tuple]
+# comparacion_real_completa(gaps_ag: list[int], arreglo_base: array.array) -> list[tuple]
 # ordena el arreglo real con el AG y con todas las secuencias clasicas, imprime tabla comparativa
 # retorna lista de tuplas (nombre, gaps, metricas) ordenada por comparaciones reales
 def comparacion_real_completa(gaps_ag, arreglo_base):

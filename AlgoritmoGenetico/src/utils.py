@@ -1,6 +1,67 @@
 import time
 import tracemalloc
+import ctypes
+import os
+import array
 from math import sqrt, log2
+
+
+# ---------------------------------------------------------------------------
+# _cargar_lib() -> ctypes.CDLL
+# carga la libreria compartida shellsort.so desde el mismo directorio que utils.py
+# configura los tipos de argumento y retorno de las funciones exportadas
+# lanza FileNotFoundError si el .so no existe (hay que compilarlo primero)
+# ---------------------------------------------------------------------------
+
+def _cargar_lib():
+    directorio = os.path.dirname(os.path.abspath(__file__))
+    ruta = os.path.join(directorio, 'shellsort.so')
+    if not os.path.exists(ruta):
+        raise FileNotFoundError(
+            f"No se encontro shellsort.so en {directorio}\n"
+            f"Compila con:  gcc -O3 -march=native -shared -fPIC -o shellsort.so shellsort.c"
+        )
+    lib = ctypes.CDLL(ruta)
+
+    lib.shell_sort_c.restype  = None
+    lib.shell_sort_c.argtypes = [
+        ctypes.POINTER(ctypes.c_longlong),  # arr
+        ctypes.c_longlong,                  # n
+        ctypes.POINTER(ctypes.c_longlong),  # gaps
+        ctypes.c_int,                       # num_gaps
+        ctypes.POINTER(ctypes.c_longlong),  # out_comps
+        ctypes.POINTER(ctypes.c_longlong),  # out_swaps
+        ctypes.POINTER(ctypes.c_longlong),  # out_comps_por_gap
+        ctypes.POINTER(ctypes.c_longlong),  # out_swaps_por_gap
+    ]
+
+    lib.verificar_ordenado.restype  = ctypes.c_int
+    lib.verificar_ordenado.argtypes = [
+        ctypes.POINTER(ctypes.c_longlong),
+        ctypes.c_longlong,
+    ]
+    return lib
+
+
+# _lib es un singleton: se carga una sola vez y se reutiliza en todas las llamadas
+_lib = None
+
+
+# _get_lib() -> ctypes.CDLL
+# retorna la libreria C cargada, inicializandola la primera vez que se llama
+def _get_lib():
+    global _lib
+    if _lib is None:
+        _lib = _cargar_lib()
+    return _lib
+
+
+# _puntero(buf: array.array) -> ctypes.POINTER(ctypes.c_longlong)
+# obtiene un puntero C directo al buffer interno de un array.array de tipo 'q'
+# sin copiar los datos — equivalente a un cast de puntero en C
+def _puntero(buf):
+    addr, _ = buf.buffer_info()
+    return ctypes.cast(addr, ctypes.POINTER(ctypes.c_longlong))
 
 
 # comparaciones_shell(gaps: list[int], n: float) -> float
@@ -44,8 +105,9 @@ def fitness(cromosoma, n):
     return costo + penalizacion_ratio
 
 
-# shell_sort_real(arr: list[int], gaps: list[int]) -> dict
-# ordena el arreglo arr en su lugar usando Shell Sort con la secuencia de gaps dada
+# shell_sort_real(arr: array.array, gaps: list[int]) -> dict
+# ordena el arreglo arr en su lugar usando Shell Sort via libreria C compilada
+# arr debe ser un array.array de tipo 'q' (long long) para evitar copias de memoria
 # retorna un diccionario con comparaciones, intercambios, tiempo_ms, memoria_kb,
 # pasos (detalle por gap) y ordenado (verificacion de correctitud)
 def shell_sort_real(arr, gaps):
@@ -53,48 +115,52 @@ def shell_sort_real(arr, gaps):
     if gaps_ord[-1] != 1:
         gaps_ord.append(1)
 
-    comparaciones  = 0
-    intercambios   = 0
-    detalle_pasos  = []
+    lib      = _get_lib()
+    n        = len(arr)
+    num_gaps = len(gaps_ord)
+
+    # gaps como buffer C sin copia
+    gaps_buf = array.array('q', gaps_ord)
+
+    out_comps         = ctypes.c_longlong(0)
+    out_swaps         = ctypes.c_longlong(0)
+    out_comps_por_gap = (ctypes.c_longlong * num_gaps)()
+    out_swaps_por_gap = (ctypes.c_longlong * num_gaps)()
 
     tracemalloc.start()
     inicio = time.perf_counter()
 
-    for h in gaps_ord:
-        comp_pasada  = 0
-        inter_pasada = 0
-        n = len(arr)
-        for i in range(h, n):
-            temp = arr[i]
-            j = i
-            while j >= h:
-                comp_pasada += 1
-                if arr[j - h] > temp:
-                    arr[j] = arr[j - h]
-                    j -= h
-                    inter_pasada += 1
-                else:
-                    break
-            arr[j] = temp
-        comparaciones += comp_pasada
-        intercambios  += inter_pasada
-        detalle_pasos.append({
-            'gap': h,
-            'comparaciones': comp_pasada,
-            'intercambios': inter_pasada
-        })
+    lib.shell_sort_c(
+        _puntero(arr), ctypes.c_longlong(n),
+        _puntero(gaps_buf), ctypes.c_int(num_gaps),
+        ctypes.byref(out_comps),
+        ctypes.byref(out_swaps),
+        out_comps_por_gap,
+        out_swaps_por_gap,
+    )
 
-    fin     = time.perf_counter()
+    fin = time.perf_counter()
     mem_actual, mem_pico = tracemalloc.get_traced_memory()
     tracemalloc.stop()
 
+    ordenado = bool(lib.verificar_ordenado(_puntero(arr), ctypes.c_longlong(n)))
+
+    detalle_pasos = [
+        {
+            'gap'          : gaps_ord[g],
+            'comparaciones': int(out_comps_por_gap[g]),
+            'intercambios' : int(out_swaps_por_gap[g]),
+        }
+        for g in range(num_gaps)
+    ]
+
     return {
-        'comparaciones' : comparaciones,
-        'intercambios'  : intercambios,
+        'comparaciones' : int(out_comps.value),
+        'intercambios'  : int(out_swaps.value),
         'tiempo_ms'     : (fin - inicio) * 1000,
         'memoria_kb'    : mem_pico / 1024,
         'pasos'         : detalle_pasos,
-        'ordenado'      : arr == sorted(arr)   # verificacion de correctitud
+        'ordenado'      : ordenado,
     }
 
 
