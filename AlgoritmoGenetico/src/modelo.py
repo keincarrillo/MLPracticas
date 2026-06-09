@@ -5,11 +5,12 @@ from utils import fitness, cromosoma_a_gaps
 # inicializar_poblacion(tam_poblacion: int, long_cromosoma: int, n: float, semilla: int | None) -> list[list[int]]
 # genera una poblacion inicial aleatoria de cromosomas
 # cada cromosoma es una lista de gaps enteros positivos, el ultimo siempre es 1
+# el rango de inicializacion cubre desde gaps pequenos hasta gaps grandes (~30% de n)
 def inicializar_poblacion(tam_poblacion, long_cromosoma, n, semilla=None):
     if semilla is not None:
         random.seed(semilla)
 
-    limite_superior = int(n ** 0.4)
+    limite_superior = int(n * 0.3)
     poblacion       = []
 
     for _ in range(tam_poblacion):
@@ -29,38 +30,40 @@ def evaluar_poblacion(poblacion, n):
     return [fitness(cromosoma, n) for cromosoma in poblacion]
 
 
-# seleccion_ruleta(poblacion: list[list[int]], fitnesses: list[float]) -> list[int]
-# seleccion proporcional al fitness usando el metodo de ruleta (roulette wheel selection)
-# como el problema es de minimizacion, se invierte el fitness para que los menores
-# tengan mayor probabilidad de ser seleccionados
-# individuos con fitness infinito quedan excluidos de la seleccion
-def seleccion_ruleta(poblacion, fitnesses):
-    # filtrar individuos validos (fitness finito)
-    pares_validos = [(i, f) for i, f in enumerate(fitnesses) if f != float('inf')]
+# seleccion_torneo(poblacion: list[list[int]], fitnesses: list[float], k: int) -> list[int]
+# seleccion por torneo estocastico: elige k individuos al azar y retorna el de menor fitness
+# k controla la presion selectiva — k mayor = mas presion, k=2 es el minimo util
+# ventajas sobre ruleta: no sufre el problema de escala cuando hay un individuo
+# mucho mejor que el resto, y mantiene mayor diversidad genetica en la poblacion
+def seleccion_torneo(poblacion, fitnesses, k=3):
+    candidatos = random.sample(range(len(poblacion)), min(k, len(poblacion)))
+    ganador    = min(candidatos, key=lambda i: fitnesses[i])
+    return poblacion[ganador]
 
-    # si todos son invalidos, retornar cualquier individuo al azar
+
+# seleccion_sus(poblacion: list[list[int]], fitnesses: list[float]) -> list[int]
+# seleccion universal estocastica (SUS): variante de ruleta con multiples punteros
+# equidistantes en una sola tirada, eliminando el sesgo estadistico de ruleta simple
+# se usa como alternativa cuando se quiere menor varianza en la seleccion
+def seleccion_sus(poblacion, fitnesses):
+    pares_validos = [(i, f) for i, f in enumerate(fitnesses) if f != float('inf')]
     if not pares_validos:
         return random.choice(poblacion)
 
-    # invertir fitness: fitness menor => peso mayor
     fitness_max = max(f for _, f in pares_validos)
     pesos       = [fitness_max - f for _, f in pares_validos]
-    total_pesos = sum(pesos)
+    total       = sum(pesos)
 
-    # si todos los pesos son 0 (fitness identico), seleccion uniforme entre validos
-    if total_pesos == 0:
-        indice = random.choice([i for i, _ in pares_validos])
-        return poblacion[indice]
+    if total == 0:
+        return poblacion[random.choice([i for i, _ in pares_validos])]
 
-    # girar la ruleta: acumular pesos y elegir con un valor aleatorio
-    punto      = random.uniform(0, total_pesos)
-    acumulado  = 0.0
-    for indice_original, peso in zip([i for i, _ in pares_validos], pesos):
+    punto     = random.uniform(0, total / len(pares_validos))
+    acumulado = 0.0
+    for indice, peso in zip([i for i, _ in pares_validos], pesos):
         acumulado += peso
         if acumulado >= punto:
-            return poblacion[indice_original]
+            return poblacion[indice]
 
-    # fallback: retornar el ultimo valido
     return poblacion[pares_validos[-1][0]]
 
 
@@ -77,7 +80,7 @@ def cruce_un_punto(padre1, padre2):
 # aplica mutacion gen a gen con probabilidad tasa_mutacion
 # desplaza cada gen un porcentaje aleatorio de su valor actual, respetando limites
 def mutar(cromosoma, tasa_mutacion, n):
-    limite_superior = int(n ** 0.4)
+    limite_superior = int(n * 0.3)
     mutado          = cromosoma[:]
 
     for i in range(len(mutado) - 1):
@@ -92,19 +95,21 @@ def mutar(cromosoma, tasa_mutacion, n):
 
 
 # evolucionar(poblacion, fitnesses, config, n) -> list[list[int]]
-# genera la siguiente generacion aplicando elitismo, seleccion por ruleta, cruce y mutacion
+# genera la siguiente generacion aplicando elitismo, seleccion por torneo, cruce y mutacion
+# usa seleccion_torneo con k=3 para mantener diversidad y evitar convergencia prematura
 def evolucionar(poblacion, fitnesses, config, n):
     tam_poblacion = config['tam_poblacion']
     tasa_mutacion = config['tasa_mutacion']
     tasa_cruce    = config['tasa_cruce']
+    k_torneo      = config.get('k_torneo', 3)
 
     # elitismo: el mejor individuo pasa sin cambios a la siguiente generacion
     indice_elite    = min(range(len(fitnesses)), key=lambda i: fitnesses[i])
     nueva_poblacion = [poblacion[indice_elite][:]]
 
     while len(nueva_poblacion) < tam_poblacion:
-        padre1 = seleccion_ruleta(poblacion, fitnesses)
-        padre2 = seleccion_ruleta(poblacion, fitnesses)
+        padre1 = seleccion_torneo(poblacion, fitnesses, k_torneo)
+        padre2 = seleccion_torneo(poblacion, fitnesses, k_torneo)
 
         if random.random() < tasa_cruce:
             hijo1, hijo2 = cruce_un_punto(padre1, padre2)
@@ -135,11 +140,11 @@ def estadisticas_generacion(fitnesses):
     if not valores_validos:
         return {'min': float('inf'), 'max': float('inf'), 'promedio': float('inf'), 'desviacion': 0.0}
 
-    n        = len(valores_validos)
-    minimo   = min(valores_validos)
-    maximo   = max(valores_validos)
-    promedio = sum(valores_validos) / n
-    varianza = sum((f - promedio) ** 2 for f in valores_validos) / n
+    n          = len(valores_validos)
+    minimo     = min(valores_validos)
+    maximo     = max(valores_validos)
+    promedio   = sum(valores_validos) / n
+    varianza   = sum((f - promedio) ** 2 for f in valores_validos) / n
     from math import sqrt
     desviacion = sqrt(varianza)
 

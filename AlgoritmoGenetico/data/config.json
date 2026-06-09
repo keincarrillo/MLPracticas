@@ -5,5 +5,6 @@
   "tasa_mutacion": 0.15,
   "tasa_cruce": 0.85,
   "long_cromosoma": 8,
-  "semilla": 42
+  "semilla": 42,
+  "k_torneo": 3
 }
