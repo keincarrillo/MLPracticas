@@ -21,7 +21,7 @@ export const HistoryChart = ({ data, loading, error }: Props) => (
   <div style={{ marginBottom: 48 }}>
     <SectionHeader
       title="Historial de precios"
-      sub="Precio de cierre diario BTC-USD — últimos 3 años"
+      sub="Precio de cierre diario BTC-USD — últimos 5 años"
     />
     {loading ? (
       <Skeleton h={280} />

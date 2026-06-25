@@ -37,7 +37,7 @@ export const StatRow = ({ history, metrics, metricsLoading }: Props) => {
         accent="#f7931a"
       />
       <StatCard
-        label="Variación 3 años"
+        label="Variación 5 años"
         value={pct ? `${pctPositive ? '+' : ''}${pct}%` : '—'}
         sub={`${firstPrice ? fmt(firstPrice) : '—'} → ${lastPrice ? fmt(lastPrice) : '—'}`}
         accent={pctPositive ? '#22c55e' : '#ef4444'}

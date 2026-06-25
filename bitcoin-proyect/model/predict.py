@@ -82,7 +82,7 @@ def get_predictions() -> tuple[list[float], list[float]]:
 
 # ── Métricas ──────────────────────────────────────────────────────────────────
 
-# get_metrics() -> float
+# get_metrics() -> floaft
 # calcula el error absoluto medio (MAE) sobre el conjunto de prueba
 # retorna el MAE redondeado a 2 decimales en USD
 def get_metrics() -> float:
